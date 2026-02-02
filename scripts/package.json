@@ -1,0 +1,24 @@
+{
+  "name": "ott-platform-scripts",
+  "version": "1.0.0",
+  "description": "Utility scripts for OTT Platform management",
+  "private": true,
+  "scripts": {
+    "create-admin": "ts-node create-admin.ts",
+    "create-admin:prod": "node dist/create-admin.js"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.10.0",
+    "@types/pg": "^8.16.0",
+    "@types/uuid": "^11.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.3.1",
+    "pg": "^8.11.3",
+    "uuid": "^9.0.1"
+  }
+}

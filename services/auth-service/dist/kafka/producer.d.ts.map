@@ -1,0 +1,1 @@
+{"version":3,"file":"producer.d.ts","sourceRoot":"","sources":["../../src/kafka/producer.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,KAAK,EAAY,MAAM,SAAS,CAAC;AAG1C,QAAA,MAAM,KAAK,OAIT,CAAC;AAEH,eAAO,IAAI,QAAQ,4BAAmB,CAAC;AAEvC,wBAAsB,YAAY,kBAQjC;AAED,wBAAsB,eAAe,kBAOpC;AAED,eAAe,KAAK,CAAC"}
