@@ -50,6 +50,29 @@ app.get('/health', (req: Request, res: Response) => {
   });
 });
 
+// Simple endpoints for frontend
+app.get('/api/notifications', (req: Request, res: Response) => {
+  res.json({
+    data: [{
+      id: '1',
+      title: 'Welcome',
+      message: 'Welcome to OTT Platform!',
+      type: 'info',
+      read: false,
+      createdAt: new Date().toISOString()
+    }]
+  });
+});
+
+app.put('/api/notifications/:notificationId/read', (req: Request, res: Response) => {
+  res.json({ success: true, message: 'Notification marked as read' });
+});
+
+app.delete('/api/notifications/:notificationId', (req: Request, res: Response) => {
+  res.json({ success: true, message: 'Notification deleted' });
+});
+
+
 // API Documentation
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 

@@ -60,6 +60,52 @@ app.get('/health', (req: Request, res: Response) => {
 // API Documentation
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
+// Simple endpoints for frontend
+app.get('/api/analytics/stats', (req: Request, res: Response) => {
+  res.json({
+    data: {
+      totalWatched: 42,
+      totalDuration: 125400,
+      averageRating: 4.2,
+      favoriteGenre: 'Action'
+    }
+  });
+});
+
+app.get('/api/analytics/history', (req: Request, res: Response) => {
+  res.json({
+    data: [{
+      id: '1',
+      videoTitle: 'Sample Video',
+      watchedAt: new Date().toISOString(),
+      duration: 3600,
+      completed: true
+    }]
+  });
+});
+
+app.get('/api/analytics/recommendations', (req: Request, res: Response) => {
+  res.json({
+    data: [
+      {
+        id: '1',
+        title: 'Recommended Video 1',
+        genre: 'Action',
+        rating: 4.5,
+        reason: 'Based on your watch history'
+      },
+      {
+        id: '2',
+        title: 'Recommended Video 2',
+        genre: 'Drama',
+        rating: 4.3,
+        reason: 'Popular in your favorite genre'
+      }
+    ]
+  });
+});
+
+
 // Routes
 app.use('/api/analytics', analyticsRoutes);
 

@@ -64,6 +64,30 @@ app.get('/health', (req: Request, res: Response) => {
 });
 
 // API Documentation
+
+// Simple endpoints for frontend
+app.get('/api/payments/subscriptions', (req: Request, res: Response) => {
+  res.json({
+    data: [
+      { id: '1', name: 'Basic', price: 4.99, features: ['720p HD', 'Watch on 1 device', 'Ad-supported'], active: false },
+      { id: '2', name: 'Standard', price: 9.99, features: ['1080p Full HD', 'Watch on 2 devices', 'Ad-free'], active: false },
+      { id: '3', name: 'Premium', price: 15.99, features: ['4K Ultra HD', 'Watch on 4 devices', 'Ad-free', 'Download content'], active: false }
+    ]
+  });
+});
+
+app.get('/api/payments/history', (req: Request, res: Response) => {
+  res.json({
+    data: [{
+      id: '1', amount: 9.99, status: 'completed', date: new Date().toISOString(), subscription: 'Standard'
+    }]
+  });
+});
+
+app.post('/api/payments/subscribe', (req: Request, res: Response) => {
+  res.json({ success: true, message: 'Successfully subscribed' });
+});
+
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // API routes
