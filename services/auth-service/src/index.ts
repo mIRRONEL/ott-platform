@@ -3,12 +3,14 @@ import dotenv from 'dotenv';
 import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
+import swaggerUi from 'swagger-ui-express';
 import { logger } from './utils/logger';
 import authRoutes from './routes/auth.routes';
 import { errorHandler } from './middleware/error.handler';
 import { connectDatabase } from './database/connection';
 import { connectKafka } from './kafka/producer';
 import { connectRedis } from './config/redis';
+import { swaggerSpec } from './config/swagger';
 
 dotenv.config();
 
@@ -57,6 +59,9 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // =============================================
 
 app.use('/api/auth', authRoutes);
+
+// API Documentation
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Health check
 app.get('/health', (req: Request, res: Response) => {

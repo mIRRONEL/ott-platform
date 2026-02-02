@@ -9,6 +9,9 @@ import BrowsePage from './pages/BrowsePage';
 import ProfilePage from './pages/ProfilePage';
 import UploadPage from './pages/UploadPage';
 import AdminDashboard from './pages/AdminDashboard';
+import PaymentPage from './pages/PaymentPage';
+import NotificationPage from './pages/NotificationPage';
+import AnalyticsPage from './pages/AnalyticsPage';
 import { useAuthStore } from './stores/auth';
 import './index.css';
 
@@ -59,6 +62,30 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/payment"
+            element={
+              <ProtectedRoute>
+                <PaymentPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/notifications"
+            element={
+              <ProtectedRoute>
+                <NotificationPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/analytics"
+            element={
+              <ProtectedRoute>
+                <AnalyticsPage />
               </ProtectedRoute>
             }
           />

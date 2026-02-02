@@ -5,7 +5,7 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 
-RUN npm ci --legacy-peer-deps
+RUN npm install --legacy-peer-deps
 
 COPY src ./src
 COPY tsconfig.json ./
@@ -21,7 +21,7 @@ RUN apk add --no-cache dumb-init
 
 COPY package.json package-lock.json ./
 
-RUN npm ci --only=production
+RUN npm install --omit=dev
 
 COPY --from=builder /app/dist ./dist
 

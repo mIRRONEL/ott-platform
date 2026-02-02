@@ -30,6 +30,8 @@
     "pg": "^8.11.0",
     "redis": "^4.6.7",
     "stripe": "^13.3.0",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.0",
     "uuid": "^9.0.0",
     "winston": "^3.8.2"
   },

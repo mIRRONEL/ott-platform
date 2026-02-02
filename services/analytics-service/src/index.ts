@@ -3,6 +3,7 @@ import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
+import swaggerUi from 'swagger-ui-express';
 import analyticsRoutes from './routes/analytics.routes';
 import { errorHandler } from './middleware/error.handler';
 import { logger } from './utils/logger';
@@ -11,6 +12,7 @@ import { connectMongoDB, closeMongoDBConnection, getMongoDb } from './database/m
 import { pgPool, closePgConnection } from './database/connection';
 import * as analyticsService from './services/analytics.service';
 import * as recommendationService from './services/recommendation.service';
+import { swaggerSpec } from './config/swagger';
 
 dotenv.config();
 
@@ -55,8 +57,11 @@ app.get('/health', (req: Request, res: Response) => {
   });
 });
 
+// API Documentation
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
 // Routes
-app.use('/api/v1/analytics', analyticsRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Error handler
 app.use(errorHandler);

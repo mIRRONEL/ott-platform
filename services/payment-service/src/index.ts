@@ -3,9 +3,11 @@ import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
+import swaggerUi from 'swagger-ui-express';
 import paymentRoutes from './routes/payment.routes';
 import { errorHandler } from './middleware/error.handler';
 import { logger } from './utils/logger';
+import { swaggerSpec } from './config/swagger';
 
 dotenv.config();
 
@@ -60,6 +62,9 @@ app.get('/health', (req: Request, res: Response) => {
     uptime: process.uptime()
   });
 });
+
+// API Documentation
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // API routes
 app.use('/api/payments', paymentLimiter, paymentRoutes);

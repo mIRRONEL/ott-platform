@@ -131,24 +131,51 @@ class ApiClient {
 
   // Payment
   async getSubscriptions() {
-    return this.client.get('/payment/subscriptions');
+    return this.client.get('/payments/subscriptions');
   }
 
   async createPaymentIntent(planId: string) {
-    return this.client.post('/payment/intent', { planId });
+    return this.client.post('/payments/intent', { planId });
   }
 
   async getCurrentSubscription() {
-    return this.client.get('/payment/subscription');
+    return this.client.get('/payments/subscription');
+  }
+
+  async getPaymentHistory() {
+    return this.client.get('/payments/history');
+  }
+
+  async subscribe(subscriptionId: string) {
+    return this.client.post('/payments/subscribe', { subscriptionId });
   }
 
   // Notifications
-  async getNotifications() {
-    return this.client.get('/notifications');
+  async getNotifications(read?: boolean) {
+    return this.client.get('/notifications', {
+      params: read === undefined ? {} : { read: String(read) }
+    });
   }
 
   async markNotificationAsRead(notificationId: string) {
     return this.client.put(`/notifications/${notificationId}/read`);
+  }
+
+  async deleteNotification(notificationId: string) {
+    return this.client.delete(`/notifications/${notificationId}`);
+  }
+
+  // Analytics
+  async getAnalyticsStats() {
+    return this.client.get('/analytics/stats');
+  }
+
+  async getAnalyticsHistory() {
+    return this.client.get('/analytics/history');
+  }
+
+  async getAnalyticsRecommendations() {
+    return this.client.get('/analytics/recommendations');
   }
 }
 

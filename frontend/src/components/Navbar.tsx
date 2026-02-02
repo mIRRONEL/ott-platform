@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LogIn, Home, Compass, User, Upload, Shield } from 'lucide-react';
+import { LogIn, Home, Compass, User, Upload, Shield, CreditCard, Bell, BarChart3 } from 'lucide-react';
 import { useAuthStore } from '../stores/auth';
 
 export default function Navbar() {
@@ -75,6 +75,36 @@ export default function Navbar() {
                 >
                   <Shield size={20} />
                   Admin
+                </Link>
+
+                <Link
+                  to="/payment"
+                  className={`px-4 py-2 rounded-lg transition flex items-center gap-2 ${
+                    isActive('/payment') ? 'bg-primary text-white' : 'text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <CreditCard size={20} />
+                  Payment
+                </Link>
+
+                <Link
+                  to="/notifications"
+                  className={`px-4 py-2 rounded-lg transition flex items-center gap-2 ${
+                    isActive('/notifications') ? 'bg-primary text-white' : 'text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <Bell size={20} />
+                  Notifications
+                </Link>
+
+                <Link
+                  to="/analytics"
+                  className={`px-4 py-2 rounded-lg transition flex items-center gap-2 ${
+                    isActive('/analytics') ? 'bg-primary text-white' : 'text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <BarChart3 size={20} />
+                  Analytics
                 </Link>
               </>
             )}
