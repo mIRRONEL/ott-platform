@@ -34,7 +34,7 @@ export default function PaymentPage() {
     try {
       setLoading(true);
       const response = await api.getSubscriptions();
-      const data = response?.data || [];
+      const data = response?.data?.data || [];
       setSubscriptions(data);
       if (data.length > 0) {
         const active = data.find((s: Subscription) => s.active);
@@ -50,7 +50,7 @@ export default function PaymentPage() {
   const fetchPaymentHistory = async () => {
     try {
       const response = await api.getPaymentHistory();
-      setPayments(response?.data || []);
+      setPayments(response?.data?.data || []);
     } catch (err) {
       console.error('Failed to load payment history');
     }

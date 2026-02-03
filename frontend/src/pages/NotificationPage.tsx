@@ -24,7 +24,7 @@ export default function NotificationPage() {
     try {
       setLoading(true);
       const response = await api.getNotifications(filter === 'unread' ? false : undefined);
-      setNotifications(response?.data || []);
+      setNotifications(response?.data?.data || []);
     } catch (err) {
       console.error('Failed to load notifications');
     } finally {
