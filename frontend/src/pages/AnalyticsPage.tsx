@@ -43,15 +43,15 @@ export default function AnalyticsPage() {
 
       // Fetch stats
       const statsResponse = await api.getAnalyticsStats();
-      setStats(statsResponse?.data || null);
+      setStats(statsResponse?.data?.data || null);
 
       // Fetch watch history
       const historyResponse = await api.getAnalyticsHistory();
-      setHistory(historyResponse?.data || []);
+      setHistory(historyResponse?.data?.data || []);
 
       // Fetch recommendations
       const recsResponse = await api.getAnalyticsRecommendations();
-      setRecommendations(recsResponse?.data || []);
+      setRecommendations(recsResponse?.data?.data || []);
     } catch (err) {
       setError('Failed to load analytics data');
       console.error(err);
