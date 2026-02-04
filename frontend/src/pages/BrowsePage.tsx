@@ -65,12 +65,12 @@ export default function BrowsePage() {
         fetch(hlsUrl)
           .then(res => res.text())
           .then(manifest => {
-            // Check if it's a real HLS playlist (has .ts segments or multiple playlists)
-            const isRealHLS = manifest.includes('.ts') || 
-                             manifest.includes('360p/playlist') ||
+            // Check if it's a real HLS playlist (has multiple quality playlists)
+            const isRealHLS = manifest.includes('360p/playlist') ||
                              manifest.includes('480p/playlist') ||
                              manifest.includes('720p/playlist') ||
-                             manifest.includes('1080p/playlist');
+                             manifest.includes('1080p/playlist') ||
+                             manifest.includes('.m3u8');
             
             if (isRealHLS) {
               console.log('[VIDEO] Real HLS detected, using HLS.js');
