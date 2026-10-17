@@ -5,6 +5,7 @@ import { pool } from '../database/connection';
 import { AppError } from '../utils/errors';
 import { logger } from '../utils/logger';
 import { AuthRequest } from '../middleware/admin.middleware';
+import auditService from '../services/audit.service';
 
 export class AdminController {
   /**
@@ -303,6 +304,65 @@ export class AdminController {
           user: result.rows[0]
         }
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get audit logs with filters (admin only)
+   */
+  async getAuditLogs(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const limit = parseInt((req as any).query?.limit as string) || 20;
+      const offset = parseInt((req as any).query?.offset as string) || 0;
+      const action = (req as any).query?.action as string;
+      const riskLevel = (req as any).query?.riskLevel as string;
+      const status = (req as any).query?.status as string;
+      const search = (req as any).query?.search as string;
+
+      const result = await auditService.queryLogs({
+        limit,
+        offset,
+        action,
+        riskLevel,
+        status,
+        search
+      });
+
+      res.json({
+        success: true,
+        data: result
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get audit statistics (admin only)
+   */
+  async getAuditStats(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const stats = await auditService.getStats();
+      res.json({
+        success: true,
+        data: { stats }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Export audit logs to CSV (admin only)
+   */
+  async exportAuditLogs(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const csv = await auditService.exportCsv();
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=security-audit-logs-${Date.now()}.csv`);
+      res.status(200).send(csv);
     } catch (error) {
       next(error);
     }

@@ -139,12 +139,62 @@ router.post('/admin/users',
   )
 );
 
-// Reset user password (admin only)
-router.post('/admin/users/:userId/reset-password',
+// =============================================
+// USER SESSION ROUTES (Requires Auth)
+// =============================================
+
+// Get all active sessions for current user
+router.get('/sessions',
+  asyncHandler(verifyAuth),
+  asyncHandler((req: Request, res: Response, next: NextFunction) =>
+    authController.getSessions(req, res, next)
+  )
+);
+
+// Revoke a specific session
+router.delete('/sessions/:sessionId',
+  asyncHandler(verifyAuth),
+  asyncHandler((req: Request, res: Response, next: NextFunction) =>
+    authController.revokeSession(req, res, next)
+  )
+);
+
+// Revoke all other sessions (Log out of all other devices)
+router.delete('/sessions',
+  asyncHandler(verifyAuth),
+  asyncHandler((req: Request, res: Response, next: NextFunction) =>
+    authController.revokeAllOtherSessions(req, res, next)
+  )
+);
+
+// =============================================
+// SECURITY AUDIT LOGS (Admin only)
+// =============================================
+
+// Get audit logs with filters
+router.get('/admin/audit-logs',
   asyncHandler(verifyAuth),
   asyncHandler(requireAdmin),
   asyncHandler((req: Request, res: Response, next: NextFunction) =>
-    adminController.resetUserPassword(req as any, res, next)
+    adminController.getAuditLogs(req as any, res, next)
+  )
+);
+
+// Get audit statistics & threat metrics
+router.get('/admin/audit-logs/stats',
+  asyncHandler(verifyAuth),
+  asyncHandler(requireAdmin),
+  asyncHandler((req: Request, res: Response, next: NextFunction) =>
+    adminController.getAuditStats(req as any, res, next)
+  )
+);
+
+// Export audit logs as CSV
+router.get('/admin/audit-logs/export',
+  asyncHandler(verifyAuth),
+  asyncHandler(requireAdmin),
+  asyncHandler((req: Request, res: Response, next: NextFunction) =>
+    adminController.exportAuditLogs(req as any, res, next)
   )
 );
 

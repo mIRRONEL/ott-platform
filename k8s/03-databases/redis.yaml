@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  namespace: ott-platform
+  labels:
+    app: redis
+spec:
+  serviceName: redis
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          command:
+            - "sh"
+            - "-c"
+            - "redis-server --requirepass \"$REDIS_PASSWORD\" --maxmemory 512m --maxmemory-policy allkeys-lru --tcp-backlog 511"
+          ports:
+            - containerPort: 6379
+              name: redis
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ott-secrets
+                  key: REDIS_PASSWORD
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1024Mi
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "redis-cli -a \"$REDIS_PASSWORD\" ping | grep -q PONG"
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "redis-cli -a \"$REDIS_PASSWORD\" ping | grep -q PONG"
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: redis-storage
+              mountPath: /data
+      volumes:
+        - name: redis-storage
+          persistentVolumeClaim:
+            claimName: redis-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: ott-platform
+  labels:
+    app: redis
+spec:
+  ports:
+    - port: 6379
+      name: redis
+      targetPort: 6379
+  selector:
+    app: redis

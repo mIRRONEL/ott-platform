@@ -16,10 +16,10 @@ export const updateProfileSchema = {
 
 export const watchlistSchema = {
   body: Joi.object({
-    videoId: Joi.string().uuid().required(),
-    title: Joi.string().max(255).optional(),
-    thumbnail: Joi.string().uri().optional(),
-    category: Joi.string().max(50).optional()
+    videoId: Joi.string().required().max(255),
+    title: Joi.string().max(255).optional().allow('', null),
+    thumbnail: Joi.string().optional().allow('', null),
+    category: Joi.string().max(100).optional().allow('', null)
   })
 };
 

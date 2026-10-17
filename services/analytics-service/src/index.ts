@@ -1,3 +1,4 @@
+import "./utils/secrets";
 import express, { Application, Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -13,6 +14,7 @@ import { pgPool, closePgConnection } from './database/connection';
 import * as analyticsService from './services/analytics.service';
 import * as recommendationService from './services/recommendation.service';
 import { swaggerSpec } from './config/swagger';
+import { metricsRegistry, metricsMiddleware } from './utils/metrics';
 
 dotenv.config();
 
@@ -22,6 +24,25 @@ const PORT = process.env.PORT || 3007;
 // Middleware
 app.set('trust proxy', 1);
 
+// Prometheus Metrics Middleware
+app.use(metricsMiddleware);
+
+// Prometheus Metrics Endpoint
+app.get('/metrics', (req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+  res.send(metricsRegistry.getMetrics());
+});
+
+// Health check endpoint
+app.get('/health', (req: Request, res: Response) => {
+  res.status(200).json({
+    status: 'UP',
+    service: 'analytics-service',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
 app.use(helmet());
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
@@ -30,8 +51,13 @@ app.use(cors({
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: 'Too many requests, please try again later.'
+  max: 1000,
+  message: 'Too many requests, please try again later.',
+  skip: (req: Request) => {
+    const secret = req.headers['x-internal-service-secret'];
+    if (secret && secret === process.env.INTERNAL_SERVICE_SECRET) return true;
+    return req.path === '/health' || req.path === '/metrics';
+  }
 });
 
 app.use(limiter);
@@ -47,64 +73,8 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// Health check endpoint
-app.get('/health', (req: Request, res: Response) => {
-  res.status(200).json({
-    status: 'UP',
-    service: 'analytics-service',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
-});
-
 // API Documentation
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-
-// Simple endpoints for frontend
-app.get('/api/analytics/stats', (req: Request, res: Response) => {
-  res.json({
-    data: {
-      totalWatched: 42,
-      totalDuration: 125400,
-      averageRating: 4.2,
-      favoriteGenre: 'Action'
-    }
-  });
-});
-
-app.get('/api/analytics/history', (req: Request, res: Response) => {
-  res.json({
-    data: [{
-      id: '1',
-      videoTitle: 'Sample Video',
-      watchedAt: new Date().toISOString(),
-      duration: 3600,
-      completed: true
-    }]
-  });
-});
-
-app.get('/api/analytics/recommendations', (req: Request, res: Response) => {
-  res.json({
-    data: [
-      {
-        id: '1',
-        title: 'Recommended Video 1',
-        genre: 'Action',
-        rating: 4.5,
-        reason: 'Based on your watch history'
-      },
-      {
-        id: '2',
-        title: 'Recommended Video 2',
-        genre: 'Drama',
-        rating: 4.3,
-        reason: 'Popular in your favorite genre'
-      }
-    ]
-  });
-});
-
 
 // Routes
 app.use('/api/analytics', analyticsRoutes);

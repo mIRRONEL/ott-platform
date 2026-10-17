@@ -1,3 +1,4 @@
+import "./utils/secrets";
 import express, { Application, Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -8,6 +9,7 @@ import paymentRoutes from './routes/payment.routes';
 import { errorHandler } from './middleware/error.handler';
 import { logger } from './utils/logger';
 import { swaggerSpec } from './config/swagger';
+import { metricsRegistry, metricsMiddleware } from './utils/metrics';
 
 dotenv.config();
 
@@ -17,6 +19,25 @@ const PORT = process.env.PORT || 3005;
 // Trust proxy
 app.set('trust proxy', 1);
 
+// Prometheus Metrics Middleware
+app.use(metricsMiddleware);
+
+// Prometheus Metrics Endpoint
+app.get('/metrics', (req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+  res.send(metricsRegistry.getMetrics());
+});
+
+// Health check endpoint
+app.get('/health', (req: Request, res: Response) => {
+  res.status(200).json({
+    status: 'UP',
+    service: 'payment-service',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
 // Security middleware
 app.use(helmet());
 app.use(cors({
@@ -24,18 +45,27 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting
+// Rate limiting - Protects direct microservice access; Gateway traffic with internal secret is whitelisted
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: 'Too many requests, please try again later.'
+  max: 1000,
+  message: 'Too many requests, please try again later.',
+  skip: (req: Request) => {
+    const secret = req.headers['x-internal-service-secret'];
+    if (secret && secret === process.env.INTERNAL_SERVICE_SECRET) return true;
+    return req.path === '/health' || req.path === '/metrics';
+  }
 });
 
-// Strict rate limiting for payment endpoints
+// Strict rate limiting for payment endpoints (skips internal gateway)
 const paymentLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 10,
-  skipSuccessfulRequests: true
+  max: 20,
+  skipSuccessfulRequests: true,
+  skip: (req: Request) => {
+    const secret = req.headers['x-internal-service-secret'];
+    return !!(secret && secret === process.env.INTERNAL_SERVICE_SECRET);
+  }
 });
 
 app.use(limiter);
@@ -51,16 +81,6 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     userAgent: req.get('user-agent')
   });
   next();
-});
-
-// Health check endpoint
-app.get('/health', (req: Request, res: Response) => {
-  res.status(200).json({
-    status: 'UP',
-    service: 'payment-service',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
 });
 
 // API Documentation

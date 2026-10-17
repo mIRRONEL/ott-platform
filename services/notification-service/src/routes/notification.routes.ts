@@ -1,11 +1,14 @@
 import { Router } from 'express';
 import {
+  getUserNotifications,
   getNotificationPreferences,
   updateNotificationPreferences,
   sendNotification,
   getNotificationHistory,
   markAsRead,
+  markAllAsRead,
   deleteNotification,
+  clearAllNotifications,
   getUnreadCount,
   verifyEmail,
   verifyPhone
@@ -18,6 +21,27 @@ import {
 } from '../schemas/notification.schema';
 
 const router = Router();
+
+/**
+ * @route GET /api/notifications
+ * @description Get user notifications
+ * @access Private
+ */
+router.get('/', getUserNotifications);
+
+/**
+ * @route PUT /api/notifications/read-all
+ * @description Mark all notifications as read
+ * @access Private
+ */
+router.put('/read-all', markAllAsRead);
+
+/**
+ * @route DELETE /api/notifications/clear-all
+ * @description Clear all notifications
+ * @access Private
+ */
+router.delete('/clear-all', clearAllNotifications);
 
 /**
  * @route GET /api/notifications/preferences/:userId
@@ -53,6 +77,7 @@ router.get('/history/:userId', getNotificationHistory);
  * @access Private
  */
 router.put('/:notificationId/read', markAsRead);
+router.put('/:notificationId/acknowledge', markAsRead);
 
 /**
  * @route DELETE /api/notifications/:notificationId

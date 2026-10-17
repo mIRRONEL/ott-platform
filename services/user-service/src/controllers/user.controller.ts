@@ -297,24 +297,60 @@ export const addToWatchlist = async (
 
     // Check if already in watchlist
     const existing = await watchlistCollection.findOne({
-      userId,
-      videoId
+      $or: [
+        { user_id: userId, video_id: videoId },
+        { userId, videoId }
+      ]
     });
 
     if (existing) {
-      throw new ValidationError('Video already in watchlist');
+      res.status(200).json({
+        status: 'success',
+        message: 'Video already in watchlist',
+        data: {
+          videoId,
+          userId,
+          title: existing.title || title || 'Video',
+          category: existing.category || category || 'General'
+        }
+      });
+      return;
     }
 
-    // Add to watchlist
-    const result = await watchlistCollection.insertOne({
+    // Try to lookup video title/category if not provided
+    let videoTitle = title;
+    let videoCategory = category;
+    let videoThumbnail = thumbnail;
+
+    if (!videoTitle) {
+      try {
+        const videosCollection = mongoDb.collection('videos');
+        const videoDoc = await videosCollection.findOne({ id: videoId });
+        if (videoDoc) {
+          videoTitle = videoDoc.title;
+          videoCategory = videoDoc.category;
+          videoThumbnail = videoDoc.thumbnail || videoDoc.posterImage;
+        }
+      } catch (err) {
+        logger.warn('Could not fetch video info for watchlist:', err);
+      }
+    }
+
+    const now = new Date();
+    const docToInsert = {
+      user_id: userId,
+      video_id: videoId,
       userId,
       videoId,
-      title,
-      thumbnail,
-      category,
-      addedAt: new Date(),
-      position: 0 // Watch position
-    });
+      title: videoTitle || 'Video',
+      thumbnail: videoThumbnail || null,
+      category: videoCategory || 'General',
+      added_at: now,
+      addedAt: now,
+      position: 0
+    };
+
+    const result = await watchlistCollection.insertOne(docToInsert);
 
     logger.info(`Video added to watchlist: ${userId} - ${videoId}`);
 
@@ -325,32 +361,20 @@ export const addToWatchlist = async (
         _id: result.insertedId,
         userId,
         videoId,
-        addedAt: new Date()
+        title: videoTitle || 'Video',
+        category: videoCategory || 'General',
+        addedAt: now
       }
     });
 
-    // Background cleanup (fire-and-forget)
-    setImmediate(() => {
-      redisClient.del(`watchlist:${userId}`)
-        .catch(err => logger.warn('Failed to invalidate watchlist cache', err));
-
-      if (kafkaProducer) {
-        kafkaProducer.send({
-          topic: 'user.watchlist.added',
-          messages: [{
-            key: userId,
-            value: JSON.stringify({
-              userId,
-              videoId,
-              title,
-              timestamp: new Date().toISOString(),
-              eventId: `${userId}-${videoId}-${Date.now()}`
-            })
-          }]
-        }).catch(err => logger.warn('Failed to publish watchlist.added event', err));
-      }
-    });
+    // Background cache cleanup (fire-and-forget)
+    try {
+      await redisClient.del(`watchlist:${userId}`);
+    } catch (cacheErr) {
+      logger.warn('Redis cache invalidation warning:', cacheErr);
+    }
   } catch (error) {
+    logger.error('Error in addToWatchlist:', error);
     next(error);
   }
 };
@@ -369,43 +393,28 @@ export const removeFromWatchlist = async (
     const mongoDb = mongoClient.db('ott_platform');
     const watchlistCollection = mongoDb.collection('watchlist');
 
-    const result = await watchlistCollection.deleteOne({
-      userId,
-      videoId
+    const result = await watchlistCollection.deleteMany({
+      $or: [
+        { user_id: userId, video_id: videoId },
+        { userId, videoId }
+      ]
     });
 
-    if (result.deletedCount === 0) {
-      throw new NotFoundError('Video not found in watchlist');
-    }
+    logger.info(`Video removed from watchlist: ${userId} - ${videoId}, deleted: ${result.deletedCount}`);
 
-    logger.info(`Video removed from watchlist: ${userId} - ${videoId}`);
+    // Invalidate cache
+    try {
+      await redisClient.del(`watchlist:${userId}`);
+    } catch (cacheErr) {
+      logger.warn('Redis cache invalidation warning:', cacheErr);
+    }
 
     res.status(200).json({
       status: 'success',
       message: 'Video removed from watchlist'
     });
-
-    // Background cleanup (fire-and-forget)
-    setImmediate(() => {
-      redisClient.del(`watchlist:${userId}`)
-        .catch(err => logger.warn('Failed to invalidate watchlist cache', err));
-
-      if (kafkaProducer) {
-        kafkaProducer.send({
-          topic: 'user.watchlist.removed',
-          messages: [{
-            key: userId,
-            value: JSON.stringify({
-              userId,
-              videoId,
-              timestamp: new Date().toISOString(),
-              eventId: `${userId}-${videoId}-${Date.now()}`
-            })
-          }]
-        }).catch(err => logger.warn('Failed to publish watchlist.removed event', err));
-      }
-    });
   } catch (error) {
+    logger.error('Error in removeFromWatchlist:', error);
     next(error);
   }
 };
@@ -420,56 +429,80 @@ export const getWatchlist = async (
 ): Promise<void> => {
   try {
     const { userId } = req.params;
-    const { page = 1, limit = 20 } = req.query;
+    const { page = 1, limit = 50 } = req.query;
 
     // Check cache first
-    const cachedWatchlist = await redisClient.get(`watchlist:${userId}`);
-    if (cachedWatchlist) {
-      logger.info(`Watchlist retrieved from cache: ${userId}`);
-      res.status(200).json({
-        status: 'success',
-        data: JSON.parse(cachedWatchlist),
-        source: 'cache'
-      });
-      return;
+    try {
+      const cachedWatchlist = await redisClient.get(`watchlist:${userId}`);
+      if (cachedWatchlist) {
+        res.status(200).json({
+          status: 'success',
+          data: JSON.parse(cachedWatchlist),
+          source: 'cache'
+        });
+        return;
+      }
+    } catch (redisErr) {
+      logger.warn('Redis read failed, falling back to DB:', redisErr);
     }
 
     const mongoDb = mongoClient.db('ott_platform');
     const watchlistCollection = mongoDb.collection('watchlist');
 
     const skip = ((Number(page) - 1) * Number(limit));
-    const sort = { addedAt: -1 };
+    const query = {
+      $or: [
+        { user_id: userId },
+        { userId }
+      ]
+    };
 
-    const watchlist = await watchlistCollection
-      .find({ userId })
-      .sort(sort as any)
+    const rawList = await watchlistCollection
+      .find(query)
+      .sort({ added_at: -1, addedAt: -1 } as any)
       .skip(skip)
       .limit(Number(limit))
       .toArray();
 
-    const total = await watchlistCollection.countDocuments({ userId });
+    const total = await watchlistCollection.countDocuments(query);
+
+    // Normalize items
+    const normalizedList = rawList.map(item => ({
+      _id: item._id,
+      userId: item.userId || item.user_id,
+      videoId: item.videoId || item.video_id,
+      title: item.title || 'Video',
+      thumbnail: item.thumbnail || null,
+      category: item.category || 'General',
+      addedAt: item.addedAt || item.added_at,
+      position: item.position || 0
+    }));
 
     const response = {
       status: 'success',
-      data: watchlist,
+      data: normalizedList,
       pagination: {
         total,
         page: Number(page),
         limit: Number(limit),
-        pages: Math.ceil(total / Number(limit))
+        pages: Math.ceil(total / Number(limit)) || 1
       },
       source: 'database'
     };
 
-    // Cache for 30 minutes
-    await redisClient.setEx(
-      `watchlist:${userId}`,
-      1800,
-      JSON.stringify(response.data)
-    );
+    try {
+      await redisClient.setEx(
+        `watchlist:${userId}`,
+        1800,
+        JSON.stringify(normalizedList)
+      );
+    } catch (cacheSetErr) {
+      logger.warn('Redis cache set warning:', cacheSetErr);
+    }
 
     res.status(200).json(response);
   } catch (error) {
+    logger.error('Error in getWatchlist:', error);
     next(error);
   }
 };

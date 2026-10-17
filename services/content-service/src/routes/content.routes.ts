@@ -14,10 +14,17 @@ import {
   getComments,
   rateVideo,
   getHLSManifest,
-  getProcessingProgress
+  getProcessingProgress,
+  initChunkedUpload,
+  getChunkedUploadStatus,
+  uploadChunk,
+  completeChunkedUpload,
+  triggerVideoTranscoding,
+  deleteRawMasterVideo,
+  getStudioSummary
 } from '../controllers/content.controller';
 import { validateRequest } from '../middleware/validation';
-import upload from '../config/multer';
+import upload, { chunkUpload } from '../config/multer';
 import {
   createVideoSchema,
   updateVideoSchema,
@@ -29,11 +36,45 @@ import {
 const router = Router();
 
 /**
+ * Studio Media Manager Summary
+ */
+router.get('/studio/summary', getStudioSummary);
+
+/**
  * @route POST /api/content/upload
- * @description Upload a video file
+ * @description Upload a monolithic video file (Legacy Fallback)
  * @access Admin
  */
 router.post('/upload', upload.single('video'), uploadVideo);
+
+/**
+ * Resumable Chunked Multipart / Binary Stream Upload Endpoints
+ */
+router.post('/upload/init', initChunkedUpload);
+router.get('/upload/status/:uploadId', getChunkedUploadStatus);
+router.post('/upload/chunk', (req, res, next) => {
+  const contentType = req.headers['content-type'] || '';
+  if (contentType.includes('multipart/form-data')) {
+    chunkUpload.single('chunk')(req, res, next);
+  } else {
+    next();
+  }
+}, uploadChunk);
+router.post('/upload/complete', completeChunkedUpload);
+
+/**
+ * @route POST /api/content/videos/:videoId/encode
+ * @description Trigger on-demand transcoding for staged or failed raw video
+ * @access Admin
+ */
+router.post('/videos/:videoId/encode', triggerVideoTranscoding);
+
+/**
+ * @route DELETE /api/content/videos/:videoId/raw
+ * @description Delete raw master file to reclaim disk space (HLS remains playable)
+ * @access Admin
+ */
+router.delete('/videos/:videoId/raw', deleteRawMasterVideo);
 
 /**
  * @route GET /api/content/videos

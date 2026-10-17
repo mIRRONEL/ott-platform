@@ -1,0 +1,288 @@
+# ==============================================================================
+# OTT Platform - Dedicated Container Resource Allocation & Limits (Override)
+# ==============================================================================
+# This file is automatically merged by Docker Compose on any standard command
+# (e.g., 'docker compose up -d', 'docker compose ps', 'docker compose build').
+#
+# Adjust CPU & Memory limits/reservations for all 27 services in this single file.
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # TIER 1: HIGH-THROUGHPUT MEDIA PIPELINE & GATEWAY
+  # ----------------------------------------------------------------------------
+  encoding-service:
+    deploy:
+      resources:
+        limits:
+          cpus: '6.50'
+          memory: 4096M
+        reservations:
+          cpus: '0.50'
+          memory: 512M
+
+  content-service:
+    deploy:
+      resources:
+        limits:
+          cpus: '3.00'
+          memory: 2048M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  nginx:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.50'
+          memory: 1024M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  api-gateway:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.00'
+          memory: 1024M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  live-service:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.50'
+          memory: 1024M
+        reservations:
+          cpus: '0.20'
+          memory: 128M
+
+  streaming-service:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 768M
+        reservations:
+          cpus: '0.20'
+          memory: 128M
+
+  # ----------------------------------------------------------------------------
+  # TIER 2: STATE, STORAGE & PERSISTENCE
+  # ----------------------------------------------------------------------------
+  mongodb:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.50'
+          memory: 1536M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  elasticsearch:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.50'
+          memory: 1280M
+        reservations:
+          cpus: '0.25'
+          memory: 640M
+
+  postgres:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.50'
+          memory: 1024M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  kafka-1:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 896M
+        reservations:
+          cpus: '0.20'
+          memory: 384M
+
+  kafka-2:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 896M
+        reservations:
+          cpus: '0.20'
+          memory: 384M
+
+  kafka-3:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 896M
+        reservations:
+          cpus: '0.20'
+          memory: 384M
+
+  redis:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 64M
+
+  # ----------------------------------------------------------------------------
+  # TIER 3: CORE MICROSERVICES & FRONTEND
+  # ----------------------------------------------------------------------------
+  auth-service:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
+
+  user-service:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
+
+  payment-service:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
+
+  notification-service:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
+
+  analytics-service:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
+
+  frontend:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 384M
+        reservations:
+          cpus: '0.10'
+          memory: 64M
+
+  # ----------------------------------------------------------------------------
+  # TIER 4: OBSERVABILITY & MONITORING STACK
+  # ----------------------------------------------------------------------------
+  prometheus:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 512M
+        reservations:
+          cpus: '0.15'
+          memory: 192M
+
+  grafana:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 384M
+        reservations:
+          cpus: '0.10'
+          memory: 96M
+
+  loki:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 384M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
+
+  promtail:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 384M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
+
+  cadvisor:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+        reservations:
+          cpus: '0.05'
+          memory: 64M
+
+  node-exporter:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.05'
+          memory: 32M
+
+  # ----------------------------------------------------------------------------
+  # TIER 5: ONE-OFF / EPHEMERAL INIT JOBS
+  # ----------------------------------------------------------------------------
+  kafka-init:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+
+  encoding-volume-init:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 64M

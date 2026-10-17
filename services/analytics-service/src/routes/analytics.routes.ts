@@ -11,6 +11,15 @@ import * as analyticsController from '../controllers/analytics.controller';
 
 const router = Router();
 
+// GET /stats - Get real dynamic platform and user stats
+router.get('/stats', analyticsController.getStats);
+
+// GET /history - Get real watch session history
+router.get('/history', analyticsController.getHistory);
+
+// GET /recommendations - Get personalized recommendations
+router.get('/recommendations', analyticsController.getRecommendationsForUser);
+
 // GET /dashboard - Get user analytics dashboard
 router.get(
   '/dashboard',

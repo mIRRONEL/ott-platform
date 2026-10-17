@@ -1,0 +1,67 @@
+#!/usr/bin/env bpftrace
+/*
+ * trace-hls-latency.bt - eBPF TCP & HLS Streaming Latency Tracer
+ *
+ * Measures TCP connection establishment latency, round-trip times (RTT),
+ * and connection lifecycle for client streaming and API Gateway traffic.
+ *
+ * Usage:
+ *   sudo bpftrace scripts/ebpf/trace-hls-latency.bt
+ */
+
+BEGIN
+{
+  printf("Tracing TCP socket latency and HLS streaming connections... Hit Ctrl-C to finish.\n\n");
+}
+
+tracepoint:sock:inet_sock_set_state
+{
+  // Track new incoming connections transitioning to ESTABLISHED (state 1)
+  if (args.newstate == 1) {
+    if (args.family == 2) {
+      @conn_established[ntop(2, args.saddr)] = count();
+    } else if (args.family == 10) {
+      @conn_established[ntop(10, args.saddr_v6)] = count();
+    }
+    @active_ports[args.dport] = count();
+  }
+}
+
+// Trace TCP Retransmits (indicators of network congestion or packet loss during 4K playback)
+tracepoint:tcp:tcp_retransmit_skb
+{
+  if (args.family == 2) {
+    printf("[!] TCP Retransmit: %s:%d -> %s:%d (Loss/Congestion)\n",
+      ntop(2, args.saddr), args.sport, ntop(2, args.daddr), args.dport);
+    @tcp_retransmits[ntop(2, args.daddr)] = count();
+  } else if (args.family == 10) {
+    printf("[!] TCP Retransmit (v6): %s:%d -> %s:%d\n",
+      ntop(10, args.saddr_v6), args.sport, ntop(10, args.daddr_v6), args.dport);
+    @tcp_retransmits[ntop(10, args.daddr_v6)] = count();
+  }
+}
+
+interval:s:5
+{
+  printf("\n=== Active Client Connection Summary (Last 5s) ===\n");
+  printf("Target Port Distribution (80: Nginx, 443: HTTPS, 3000: Gateway, 1935: RTMP):\n");
+  print(@active_ports);
+  
+  printf("\nTop Client IPs by Established Connections:\n");
+  print(@conn_established);
+
+  printf("\nTCP Retransmit Count:\n");
+  print(@tcp_retransmits);
+
+  clear(@active_ports);
+  clear(@conn_established);
+  clear(@tcp_retransmits);
+}
+
+END
+{
+  printf("\nDetaching eBPF probes. Cleaning up...\n");
+  clear(@active_ports);
+  clear(@conn_established);
+  clear(@tcp_retransmits);
+}

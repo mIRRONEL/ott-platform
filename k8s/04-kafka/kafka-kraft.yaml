@@ -1,0 +1,120 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-headless
+  namespace: ott-platform
+  labels:
+    app: kafka
+spec:
+  clusterIP: None
+  ports:
+    - port: 9092
+      name: client
+    - port: 9093
+      name: controller
+  selector:
+    app: kafka
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: ott-platform
+  labels:
+    app: kafka
+spec:
+  ports:
+    - port: 9092
+      name: client
+      targetPort: 9092
+  selector:
+    app: kafka
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka
+  namespace: ott-platform
+  labels:
+    app: kafka
+spec:
+  serviceName: kafka-headless
+  replicas: 3
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      containers:
+        - name: kafka
+          image: confluentinc/cp-kafka:7.5.0
+          command:
+            - "sh"
+            - "-c"
+            - |
+              export KAFKA_NODE_ID=${HOSTNAME##*-}
+              export KAFKA_ADVERTISED_LISTENERS="PLAINTEXT://${HOSTNAME}.kafka-headless.ott-platform.svc.cluster.local:9092"
+              exec /etc/confluent/docker/run
+          ports:
+            - containerPort: 9092
+              name: client
+            - containerPort: 9093
+              name: controller
+          env:
+            - name: KAFKA_PROCESS_ROLES
+              value: "broker,controller"
+            - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+              value: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+            - name: KAFKA_LISTENERS
+              value: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+            - name: KAFKA_INTER_BROKER_LISTENER_NAME
+              value: "PLAINTEXT"
+            - name: KAFKA_CONTROLLER_LISTENER_NAMES
+              value: "CONTROLLER"
+            - name: KAFKA_CONTROLLER_QUORUM_VOTERS
+              value: "0@kafka-0.kafka-headless.ott-platform.svc.cluster.local:9093,1@kafka-1.kafka-headless.ott-platform.svc.cluster.local:9093,2@kafka-2.kafka-headless.ott-platform.svc.cluster.local:9093"
+            - name: KAFKA_KRAFT_CLUSTER_ID
+              value: "Mjp3FnJmS4q2vqUEgQ-zHQ"
+            - name: CLUSTER_ID
+              value: "Mjp3FnJmS4q2vqUEgQ-zHQ"
+            - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+              value: "3"
+            - name: KAFKA_OFFSETS_TOPIC_MIN_ISR
+              value: "2"
+            - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+              value: "3"
+            - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
+              value: "2"
+            - name: KAFKA_AUTO_CREATE_TOPICS_ENABLE
+              value: "true"
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1536Mi
+          livenessProbe:
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          readinessProbe:
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          volumeMounts:
+            - name: kafka-data
+              mountPath: /var/lib/kafka/data
+  volumeClaimTemplates:
+    - metadata:
+        name: kafka-data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 15Gi

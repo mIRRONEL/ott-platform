@@ -1,3 +1,4 @@
+import "./utils/secrets";
 import express, { Application, Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -6,6 +7,7 @@ import dotenv from 'dotenv';
 import streamingRoutes from './routes/streaming.routes';
 import { errorHandler } from './middleware/error.handler';
 import { logger } from './utils/logger';
+import { metricsRegistry, metricsMiddleware } from './utils/metrics';
 
 dotenv.config();
 
@@ -15,19 +17,32 @@ const PORT = process.env.PORT || 3004;
 // Trust proxy
 app.set('trust proxy', 1);
 
+// Prometheus Metrics Middleware
+app.use(metricsMiddleware);
+
 // Security middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: false,
+  crossOriginOpenerPolicy: false,
+  contentSecurityPolicy: false
+}));
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  origin: '*',
   credentials: true
 }));
 
-// Rate limiting for streaming
+// Rate limiting for streaming - increased for HLS (many segment requests)
 const streamLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 50,
+  max: 10000,
+  skip: (req: Request) => {
+    if (req.path.includes('segment') || req.path.includes('playlist') || req.path.includes('.ts') || req.path.includes('.m3u8')) {
+      return true;
+    }
+    return false;
+  },
   keyGenerator: (req: Request) => {
-    return req.ip || 'unknown';
+    return (req.headers['x-forwarded-for'] as string) || req.ip || 'unknown';
   }
 });
 
@@ -42,6 +57,12 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     userAgent: req.get('user-agent')
   });
   next();
+});
+
+// Prometheus Metrics Endpoint
+app.get('/metrics', (req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+  res.send(metricsRegistry.getMetrics());
 });
 
 // Health check endpoint

@@ -5,6 +5,7 @@ import fs from 'fs';
 import os from 'os';
 import { logger } from './logger';
 import { mongoClient } from '../database/mongodb.connection';
+import { ObjectId } from 'mongodb';
 
 const execAsync = promisify(exec);
 
@@ -31,7 +32,7 @@ async function updateVideoProgress(videoId: string, progress: number, stage: str
     const db = mongoClient.db('ott_platform');
     const videosCollection = db.collection('videos');
     await videosCollection.updateOne(
-      { id: videoId },
+      { _id: new ObjectId(videoId) },
       {
         $set: {
           hlsProgress: progress,

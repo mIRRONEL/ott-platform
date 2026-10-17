@@ -8,6 +8,28 @@ import { producer } from '../kafka/producer';
 import { logger } from '../utils/logger';
 import { AppError } from '../utils/errors';
 import redisService from '../config/redis';
+import sessionService from '../services/session.service';
+import auditService from '../services/audit.service';
+
+export const getClientIp = (req: Request): string => {
+  const forwarded = req.headers['x-forwarded-for'];
+  let ip = '';
+  if (forwarded) {
+    if (Array.isArray(forwarded)) {
+      ip = forwarded[0];
+    } else {
+      ip = forwarded.split(',')[0].trim();
+    }
+  }
+  if (!ip) {
+    ip = (req.headers['x-real-ip'] as string) || (req.headers['x-client-ip'] as string) || req.ip || req.socket?.remoteAddress || '127.0.0.1';
+  }
+  // Strip IPv6-mapped IPv4 prefix (::ffff:)
+  if (ip && ip.startsWith('::ffff:')) {
+    ip = ip.substring(7);
+  }
+  return ip || '127.0.0.1';
+};
 
 export class AuthController {
   /**
@@ -41,37 +63,57 @@ export class AuthController {
 
       const user = result.rows[0];
 
-      // Publish user.registered event to Kafka
-      await producer.send({
-        topic: 'user.registered',
-        messages: [
-          {
-            key: userId,
-            value: JSON.stringify({
-              event_id: uuidv4(),
-              event_type: 'user.registered',
-              timestamp: new Date().toISOString(),
-              user_id: userId,
-              email: user.email,
-              first_name: user.first_name,
-              last_name: user.last_name,
-              country: country || null,
-              signup_source: 'web'
-            })
-          }
-        ]
+      // Audit log registration
+      const clientIp = getClientIp(req);
+      const userAgent = req.headers['user-agent'] as string || '';
+      await auditService.logEvent({
+        userId: user.id,
+        userEmail: user.email,
+        action: 'REGISTER_SUCCESS',
+        entityType: 'USER',
+        entityId: user.id,
+        ipAddress: clientIp,
+        userAgent,
+        status: 'SUCCESS',
+        riskLevel: 'LOW'
       });
 
-      logger.info(`New user registered: ${email}`);
+      // Publish user.registered event to Kafka
+      try {
+        await producer.send({
+          topic: 'user.registered',
+          messages: [
+            {
+              key: userId,
+              value: JSON.stringify({
+                event_id: uuidv4(),
+                event_type: 'user.registered',
+                timestamp: new Date().toISOString(),
+                user_id: userId,
+                email: user.email,
+                first_name: user.first_name,
+                last_name: user.last_name,
+                country: country || null,
+                signup_source: 'web'
+              })
+            }
+          ]
+        });
+        logger.info(`User registered event published for: ${user.id}`);
+      } catch (kafkaError) {
+        logger.error('Failed to publish user.registered event to Kafka:', kafkaError);
+      }
 
       res.status(201).json({
         success: true,
         message: 'User registered successfully',
         data: {
-          user_id: user.id,
-          email: user.email,
-          first_name: user.first_name,
-          last_name: user.last_name
+          user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.first_name,
+            lastName: user.last_name
+          }
         }
       });
     } catch (error) {
@@ -83,17 +125,30 @@ export class AuthController {
    * Login user - WORKING VERSION
    */
   async login(req: Request, res: Response, next: NextFunction) {
+    const clientIp = getClientIp(req);
+    const userAgent = req.headers['user-agent'] as string || '';
+    const { email, password } = req.body;
+
     try {
-      const { email, password } = req.body;
-      logger.info(`Login attempt for: ${email}`);
+      logger.info(`Login attempt for: ${email} from ${clientIp}`);
 
       // Use simple SELECT that works (same as register does)
       const userResult = await pool.query(
-        `SELECT id, email, password_hash, status FROM users WHERE email = $1 LIMIT 1`,
+        `SELECT id, email, first_name, last_name, role, password_hash, status FROM users WHERE email = $1 LIMIT 1`,
         [email]
       );
 
       if (userResult.rows.length === 0) {
+        await auditService.logEvent({
+          userEmail: email,
+          action: 'LOGIN_FAILED',
+          entityType: 'AUTH',
+          ipAddress: clientIp,
+          userAgent,
+          status: 'FAILURE',
+          riskLevel: 'HIGH',
+          newValues: { reason: 'User not found' }
+        });
         return res.status(401).json({
           success: false,
           message: 'Invalid email or password'
@@ -103,6 +158,17 @@ export class AuthController {
       const user = userResult.rows[0];
 
       if (user.status !== 'active') {
+        await auditService.logEvent({
+          userId: user.id,
+          userEmail: user.email,
+          action: 'LOGIN_BLOCKED',
+          entityType: 'AUTH',
+          ipAddress: clientIp,
+          userAgent,
+          status: 'WARNING',
+          riskLevel: 'HIGH',
+          newValues: { reason: 'Account inactive or banned' }
+        });
         return res.status(403).json({
           success: false,
           message: 'Account is inactive'
@@ -112,26 +178,47 @@ export class AuthController {
       // Verify password
       const passwordMatch = await bcrypt.compare(password, user.password_hash);
       if (!passwordMatch) {
+        await auditService.logEvent({
+          userId: user.id,
+          userEmail: user.email,
+          action: 'LOGIN_FAILED',
+          entityType: 'AUTH',
+          ipAddress: clientIp,
+          userAgent,
+          status: 'FAILURE',
+          riskLevel: 'HIGH',
+          newValues: { reason: 'Invalid credentials' }
+        });
         return res.status(401).json({
           success: false,
           message: 'Invalid email or password'
         });
       }
 
-      // Generate tokens
+      // Generate tokens with role and unique JTI
+      const jti = uuidv4();
       const accessToken = jwt.sign(
-        { user_id: user.id, email: user.email },
+        { user_id: user.id, email: user.email, role: user.role || 'user', jti },
         process.env.JWT_SECRET || 'your_jwt_secret_here',
         { expiresIn: '1h' }
       );
 
       const refreshToken = jwt.sign(
-        { user_id: user.id },
+        { user_id: user.id, role: user.role || 'user', jti },
         process.env.JWT_REFRESH_SECRET || 'refresh-secret',
         { expiresIn: '7d' }
       );
 
-      logger.info(`User logged in: ${email}`);
+      // Register session
+      const sessionId = await sessionService.createSession({
+        userId: user.id,
+        userEmail: user.email,
+        jti,
+        ipAddress: clientIp,
+        userAgent
+      });
+
+      logger.info(`User logged in: ${email} (Role: ${user.role || 'user'}, Session: ${sessionId})`);
 
       return res.status(200).json({
         success: true,
@@ -139,7 +226,15 @@ export class AuthController {
         data: {
           access_token: accessToken,
           refresh_token: refreshToken,
-          expires_in: 3600
+          session_id: sessionId,
+          expires_in: 3600,
+          user: {
+            id: user.id,
+            email: user.email,
+            role: user.role || 'user',
+            firstName: user.first_name,
+            lastName: user.last_name
+          }
         }
       });
     } catch (error) {
@@ -356,6 +451,71 @@ export class AuthController {
       res.json({
         success: true,
         data: decoded
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get active sessions for current user
+   */
+  async getSessions(req: Request, res: Response, next: NextFunction) {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) throw new AppError('Unauthorized', 401);
+      const token = authHeader.split(' ')[1];
+      const decoded: any = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret_here');
+      
+      const sessions = await sessionService.getUserSessions(decoded.user_id, decoded.jti);
+      res.json({
+        success: true,
+        data: {
+          sessions,
+          total: sessions.length
+        }
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Revoke a specific session
+   */
+  async revokeSession(req: Request, res: Response, next: NextFunction) {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) throw new AppError('Unauthorized', 401);
+      const token = authHeader.split(' ')[1];
+      const decoded: any = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret_here');
+      const { sessionId } = req.params;
+
+      const success = await sessionService.revokeSession(decoded.user_id, sessionId, decoded.email);
+      res.json({
+        success,
+        message: success ? 'Session revoked successfully' : 'Session not found'
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Revoke all sessions except current one
+   */
+  async revokeAllOtherSessions(req: Request, res: Response, next: NextFunction) {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) throw new AppError('Unauthorized', 401);
+      const token = authHeader.split(' ')[1];
+      const decoded: any = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret_here');
+
+      const count = await sessionService.revokeAllOtherSessions(decoded.user_id, decoded.jti, decoded.email);
+      res.json({
+        success: true,
+        message: `Successfully logged out of ${count} other device(s)`,
+        data: { revokedCount: count }
       });
     } catch (error) {
       next(error);

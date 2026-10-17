@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+  namespace: ott-platform
+  labels:
+    app: analytics-service
+    tier: backend
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: analytics-service
+  template:
+    metadata:
+      labels:
+        app: analytics-service
+        tier: backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3007"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: analytics-service
+          image: ott-analytics-service:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: ott-config
+            - secretRef:
+                name: ott-secrets
+          env:
+            - name: PORT
+              value: "3007"
+            - name: PGAPPNAME
+              value: "analytics-service"
+            - name: KAFKA_CONSUMER_GROUP
+              value: "analytics-service"
+            - name: NODE_OPTIONS
+              value: "--max-old-space-size=512"
+          ports:
+            - containerPort: 3007
+              name: http
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3007
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3007
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-service
+  namespace: ott-platform
+  labels:
+    app: analytics-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3007
+      targetPort: 3007
+      name: http
+  selector:
+    app: analytics-service

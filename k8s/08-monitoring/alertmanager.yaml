@@ -1,0 +1,105 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: ott-platform
+data:
+  alertmanager.yml: |
+    global:
+      resolve_timeout: 5m
+
+    route:
+      group_by: ['alertname', 'service', 'severity']
+      group_wait: 10s
+      group_interval: 1m
+      repeat_interval: 4h
+      receiver: 'default-receiver'
+      routes:
+        - match:
+            severity: critical
+          receiver: 'critical-receiver'
+          continue: true
+
+    receivers:
+      - name: 'default-receiver'
+      - name: 'critical-receiver'
+
+    inhibit_rules:
+      - source_match:
+          severity: 'critical'
+        target_match:
+          severity: 'warning'
+        equal: ['alertname', 'service', 'instance']
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  namespace: ott-platform
+  labels:
+    app: alertmanager
+    tier: monitoring
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: alertmanager
+  template:
+    metadata:
+      labels:
+        app: alertmanager
+        tier: monitoring
+    spec:
+      containers:
+        - name: alertmanager
+          image: prom/alertmanager:v0.26.0
+          args:
+            - "--config.file=/etc/alertmanager/alertmanager.yml"
+            - "--storage.path=/alertmanager"
+          ports:
+            - containerPort: 9093
+              name: http
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: 9093
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: 9093
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: config
+              mountPath: /etc/alertmanager
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+      volumes:
+        - name: config
+          configMap:
+            name: alertmanager-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+  namespace: ott-platform
+  labels:
+    app: alertmanager
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9093
+      targetPort: 9093
+      name: http
+  selector:
+    app: alertmanager

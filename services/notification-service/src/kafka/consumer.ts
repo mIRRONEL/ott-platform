@@ -1,16 +1,22 @@
 import { Kafka, Consumer } from 'kafkajs';
+import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger';
+import { mongoClient } from '../database/mongodb.connection';
 import { sendEmail } from '../services/email.service';
 import { sendSMS } from '../services/sms.service';
 import { sendPushNotification } from '../services/push.service';
 
 const kafka = new Kafka({
   clientId: 'notification-service',
-  brokers: (process.env.KAFKA_BROKERS || 'localhost:9092').split(','),
+  brokers: (process.env.KAFKA_BROKERS || 'localhost:9092,localhost:9094,localhost:9096').split(','),
   retry: {
-    initialRetryTime: 100,
-    retries: 8
-  }
+    initialRetryTime: parseInt(process.env.KAFKA_RETRY_INITIAL_RETRY_TIME || '100'),
+    retries: parseInt(process.env.KAFKA_RETRY_MAX_RETRIES || '15'),
+    maxRetryTime: 30000,
+    multiplier: 2,
+  },
+  connectionTimeout: parseInt(process.env.KAFKA_CONNECT_TIMEOUT || '15000'),
+  requestTimeout: parseInt(process.env.KAFKA_REQUEST_TIMEOUT || '30000'),
 });
 
 let consumer: Consumer;
@@ -26,10 +32,21 @@ export const initializeKafkaConsumer = async () => {
   isConnecting = true;
 
   try {
-    consumer = kafka.consumer({ groupId: 'notification-service-group' });
+    consumer = kafka.consumer({
+      groupId: 'notification-service-group',
+      sessionTimeout: 30000,
+      heartbeatInterval: 3000,
+      rebalanceTimeout: 60000,
+      allowAutoTopicCreation: false,
+      retry: {
+        initialRetryTime: 100,
+        retries: 15,
+        maxRetryTime: 30000,
+      },
+    });
 
     await consumer.connect();
-    logger.info('Kafka consumer connected');
+    logger.info('Kafka consumer connected (3-broker KRaft cluster)');
 
     // Subscribe to notification topics
     await consumer.subscribe({
@@ -45,8 +62,9 @@ export const initializeKafkaConsumer = async () => {
       fromBeginning: false
     });
 
-    // Start consuming messages
+    // Start consuming messages with session management
     await consumer.run({
+      partitionsConsumedConcurrently: 3,
       eachMessage: async ({ topic, partition, message }) => {
         try {
           const value = message.value?.toString();
@@ -237,11 +255,39 @@ async function handleUserRegistered(event: any) {
 async function handleVideoReady(event: any) {
   logger.info('Video ready event received:', event);
 
-  const { videoId, videoTitle, category } = event;
+  const { videoId, videoTitle, category, userId } = event;
+  const title = `🎬 Video Ready: ${videoTitle || 'Your Video'}`;
+  const message = `Your video "${videoTitle || 'Untitled'}" has finished multi-profile HLS encoding (1080p, 720p, 480p, 360p) and is now available to stream.`;
 
-  // Get users interested in this category
-  // Send notifications to relevant users
-  // This would typically query a preferences database
+  try {
+    const mongoDb = mongoClient.db('ott_platform');
+    const notificationsCollection = mongoDb.collection('notifications');
+
+    const notificationRecord = {
+      _id: uuidv4(),
+      userId: userId || 'all',
+      isBroadcast: true,
+      type: 'success',
+      title,
+      subject: title,
+      message,
+      videoId,
+      category: category || 'Movies',
+      read: false,
+      status: 'sent',
+      createdAt: new Date(),
+      priority: 'high'
+    };
+
+    await notificationsCollection.insertOne(notificationRecord);
+    logger.info(`✓ In-app notification created for ready video: ${videoId}`);
+
+    if (userId && userId !== 'all') {
+      await sendPushNotification(userId, title, { videoId, message });
+    }
+  } catch (err) {
+    logger.error(`Failed to create notification for ready video ${videoId}:`, err);
+  }
 }
 
 export const disconnectConsumer = async () => {

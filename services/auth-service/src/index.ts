@@ -1,3 +1,4 @@
+import "./utils/secrets";
 import express, { Express, Request, Response, NextFunction } from 'express';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
@@ -11,15 +12,37 @@ import { connectDatabase } from './database/connection';
 import { connectKafka } from './kafka/producer';
 import { connectRedis } from './config/redis';
 import { swaggerSpec } from './config/swagger';
+import { metricsRegistry, metricsMiddleware } from './utils/metrics';
 
 dotenv.config();
 
 const app: Express = express();
 const PORT = process.env.PORT || 3001;
 
+// Trust upstream reverse proxy headers (Nginx / API Gateway)
+app.set('trust proxy', true);
+
 // =============================================
 // MIDDLEWARE
 // =============================================
+
+// Prometheus Metrics Middleware
+app.use(metricsMiddleware);
+
+// Prometheus Metrics Endpoint
+app.get('/metrics', (req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+  res.send(metricsRegistry.getMetrics());
+});
+
+// Health check
+app.get('/health', (req: Request, res: Response) => {
+  res.json({
+    status: 'ok',
+    service: 'auth-service',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Security middleware
 app.use(helmet({
@@ -31,11 +54,16 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting
+// Rate limiting - Protects direct microservice access; Gateway traffic with internal secret is whitelisted
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
+  max: 1000,
+  message: 'Too many requests from this IP, please try again later.',
+  skip: (req: Request) => {
+    const secret = req.headers['x-internal-service-secret'];
+    if (secret && secret === process.env.INTERNAL_SERVICE_SECRET) return true;
+    return req.path === '/health' || req.path === '/metrics';
+  }
 });
 app.use(limiter);
 
@@ -62,15 +90,6 @@ app.use('/api/auth', authRoutes);
 
 // API Documentation
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-
-// Health check
-app.get('/health', (req: Request, res: Response) => {
-  res.json({
-    status: 'ok',
-    service: 'auth-service',
-    timestamp: new Date().toISOString()
-  });
-});
 
 // =============================================
 // ERROR HANDLING

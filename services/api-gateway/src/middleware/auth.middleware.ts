@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { logger } from '../utils/logger';
+import { redisClient } from '../config/redis';
 
 declare global {
   namespace Express {
@@ -9,12 +10,13 @@ declare global {
         userId: string;
         email: string;
         role: string;
+        jti?: string;
       };
     }
   }
 }
 
-export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
+export const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = extractToken(req);
 
@@ -23,13 +25,32 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
       return next();
     }
 
-    const jwtSecret = process.env.JWT_SECRET || 'your_jwt_secret_here';
+    const jwtSecret = process.env.JWT_SECRET || 'PnuI0vPoM80lH3NYnWWi/AU6MYEZSY5OYrSke2BeNJU';
     const decoded = jwt.verify(token, jwtSecret) as any;
+
+    // Check Redis blacklist if token has a jti
+    if (decoded.jti) {
+      try {
+        const isRevoked = await redisClient.get(`blacklist:${decoded.jti}`);
+        if (isRevoked) {
+          logger.warn(`[Auth Guard] Rejected revoked JWT with JTI: ${decoded.jti}`);
+          return res.status(401).json({
+            status: 'error',
+            message: 'Session has been revoked or logged out remotely. Please sign in again.',
+            statusCode: 401,
+            code: 'TOKEN_REVOKED'
+          });
+        }
+      } catch (err) {
+        logger.warn('[Auth Guard] Redis blacklist check warning:', err);
+      }
+    }
 
     req.user = {
       userId: decoded.user_id || decoded.userId || decoded.sub,
       email: decoded.email,
-      role: decoded.role || 'user'
+      role: decoded.role || 'user',
+      jti: decoded.jti
     };
 
     logger.info(`Authenticated user: ${req.user.userId}`);
@@ -58,6 +79,73 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
       status: 'error',
       message: 'Internal server error',
       statusCode: 500
+    });
+  }
+};
+
+export const optionalAuthMiddleware = (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = extractToken(req);
+
+    if (!token) {
+      return next();
+    }
+
+    const jwtSecret = process.env.JWT_SECRET || 'PnuI0vPoM80lH3NYnWWi/AU6MYEZSY5OYrSke2BeNJU';
+    const decoded = jwt.verify(token, jwtSecret) as any;
+
+    req.user = {
+      userId: decoded.user_id || decoded.userId || decoded.sub,
+      email: decoded.email,
+      role: decoded.role || 'user'
+    };
+
+    logger.info(`Authenticated user (optional): ${req.user.userId}`);
+  } catch (error) {
+    logger.warn('Optional auth token invalid/expired, continuing as guest');
+  }
+  next();
+};
+
+export const adminOnlyMiddleware = (req: Request, res: Response, next: NextFunction) => {
+  // Allow internal service secret bypass
+  const internalSecret = req.headers['x-internal-service-secret'];
+  if (internalSecret && internalSecret === process.env.INTERNAL_SERVICE_SECRET) {
+    return next();
+  }
+
+  const token = extractToken(req);
+  if (!token) {
+    return res.status(401).json({
+      status: 'error',
+      code: 'UNAUTHORIZED',
+      message: 'Authentication required for system administration access'
+    });
+  }
+
+  try {
+    const jwtSecret = process.env.JWT_SECRET || 'PnuI0vPoM80lH3NYnWWi/AU6MYEZSY5OYrSke2BeNJU';
+    const decoded = jwt.verify(token, jwtSecret) as any;
+    req.user = {
+      userId: decoded.user_id || decoded.userId || decoded.sub,
+      email: decoded.email,
+      role: decoded.role || 'user'
+    };
+
+    if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+      return res.status(403).json({
+        status: 'error',
+        code: 'FORBIDDEN',
+        message: 'Forbidden: System administration access required'
+      });
+    }
+
+    next();
+  } catch (error: any) {
+    return res.status(401).json({
+      status: 'error',
+      code: 'INVALID_TOKEN',
+      message: 'Invalid or expired authentication token'
     });
   }
 };

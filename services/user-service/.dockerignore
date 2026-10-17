@@ -1,0 +1,11 @@
+node_modules
+npm-debug.log
+.env*
+!.env.example
+.git
+.github
+coverage
+dist
+build
+.DS_Store
+*.log

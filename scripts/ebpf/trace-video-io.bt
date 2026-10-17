@@ -1,0 +1,53 @@
+#!/usr/bin/env bpftrace
+/*
+ * trace-video-io.bt - eBPF Block I/O Latency & Throughput Tracer
+ *
+ * Traces disk read/write latency and IOPS for the OTT video platform
+ * storage volume (/videos_data) during parallel FFmpeg transcoding and
+ * HLS segment delivery.
+ *
+ * Usage:
+ *   sudo bpftrace scripts/ebpf/trace-video-io.bt
+ */
+
+BEGIN
+{
+  printf("Tracing Block I/O latency and throughput for OTT Platform... Hit Ctrl-C to finish.\n");
+  printf("Collecting disk I/O metrics across all transcoding and streaming workers...\n\n");
+}
+
+tracepoint:block:block_rq_issue
+{
+  @start[args.dev, args.sector] = nsecs;
+  @io_bytes[args.comm] = sum(args.bytes);
+}
+
+tracepoint:block:block_rq_complete
+/@start[args.dev, args.sector]/
+{
+  $duration_us = (nsecs - @start[args.dev, args.sector]) / 1000;
+  @io_latency_us[comm] = hist($duration_us);
+  @io_count[comm] = count();
+  delete(@start[args.dev, args.sector]);
+}
+
+interval:s:5
+{
+  printf("\n=== Real-Time I/O Activity (Last 5s) - %s ===\n", strftime("%H:%M:%S", nsecs));
+  printf("I/O Operations Count:\n");
+  print(@io_count);
+  printf("Total I/O Bytes:\n");
+  print(@io_bytes);
+  clear(@io_count);
+  clear(@io_bytes);
+}
+
+END
+{
+  printf("\n=== Final Block I/O Latency Distribution (microseconds) ===\n");
+  print(@io_latency_us);
+  clear(@start);
+  clear(@io_latency_us);
+  clear(@io_bytes);
+  clear(@io_count);
+}

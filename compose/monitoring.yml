@@ -1,0 +1,229 @@
+# ==============================================================================
+# OTT Platform - Observability & Monitoring Tier
+# ==============================================================================
+# Services: Prometheus, Alertmanager, Grafana, Loki, Promtail, cAdvisor,
+#           Node-Exporter, Postgres-Exporter, Redis-Exporter,
+#           Elasticsearch-Exporter, Kafka-Exporter, Nginx-Exporter, Blackbox-Exporter
+# ==============================================================================
+
+services:
+  # Prometheus - Time-series Metrics Engine
+  prometheus:
+    image: prom/prometheus:v2.49.1
+    container_name: ott-prometheus
+    volumes:
+      - ../monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../monitoring/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+    ports:
+      - "127.0.0.1:9090:9090"
+    networks:
+      - ott-edge-net
+      - ott-app-net
+      - ott-data-net
+      - ott-network
+    depends_on:
+      - alertmanager
+    restart: unless-stopped
+
+  # Alertmanager - Alert Routing & Incident Notification Engine
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: ott-alertmanager
+    volumes:
+      - ../monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    ports:
+      - "127.0.0.1:9093:9093"
+    networks:
+      - ott-network
+    restart: unless-stopped
+
+  # Grafana - Unified Observability & Analytics Dashboards
+  grafana:
+    image: grafana/grafana:10.3.3
+    container_name: ott-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=5k$$forYou
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+      - GF_SERVER_HTTP_PORT=3000
+      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+    volumes:
+      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3008:3000"
+    networks:
+      - ott-edge-net
+      - ott-network
+    depends_on:
+      - prometheus
+      - loki
+    restart: unless-stopped
+
+  # Loki - Centralized Log Aggregation Engine
+  loki:
+    image: grafana/loki:2.9.4
+    container_name: ott-loki
+    volumes:
+      - ../monitoring/loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "127.0.0.1:3100:3100"
+    networks:
+      - ott-network
+    restart: unless-stopped
+
+  # Promtail - Log Shipper Agent for Docker & Syslog
+  promtail:
+    image: grafana/promtail:2.9.4
+    container_name: ott-promtail
+    volumes:
+      - ../monitoring/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /home/almalinux/.local/share/docker/containers:/containers:ro
+      - /var/log:/var/log:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - ott-network
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+  # cAdvisor - Google Container Telemetry & cgroup Resource Monitor
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.2
+    container_name: ott-cadvisor
+    privileged: true
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /run/user/1000/docker.sock:/var/run/docker.sock:ro
+      - /sys:/sys:ro
+      - /home/almalinux/.local/share/docker:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports:
+      - "127.0.0.1:8080:8080"
+    networks:
+      - ott-network
+    restart: unless-stopped
+
+  # Node Exporter - Linux Host Machine Resource Exporter
+  node-exporter:
+    image: prom/node-exporter:v1.7.0
+    container_name: ott-node-exporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    ports:
+      - "127.0.0.1:9100:9100"
+    networks:
+      - ott-network
+    restart: unless-stopped
+
+  # PostgreSQL Exporter - Deep Database Performance & Connection Telemetry
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: ott-postgres-exporter
+    environment:
+      DATA_SOURCE_URI: "postgres:5432/ott_platform?sslmode=disable"
+      DATA_SOURCE_USER: "postgres"
+      DATA_SOURCE_PASS_FILE: "/run/secrets/postgres_password"
+    secrets:
+      - postgres_password
+    ports:
+      - "127.0.0.1:9187:9187"
+    networks:
+      - ott-data-net
+      - ott-network
+    restart: unless-stopped
+
+  # Redis Exporter - Cache Hit/Miss, Memory Fragmentation & Eviction Telemetry
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: ott-redis-exporter
+    environment:
+      REDIS_ADDR: "redis:6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    ports:
+      - "127.0.0.1:9121:9121"
+    networks:
+      - ott-data-net
+      - ott-network
+    restart: unless-stopped
+
+  # Elasticsearch Exporter - Cluster Health, JVM Heap & Indexing Telemetry
+  elasticsearch-exporter:
+    image: prometheuscommunity/elasticsearch-exporter:latest
+    container_name: ott-elasticsearch-exporter
+    command:
+      - '--es.uri=http://elasticsearch:9200'
+      - '--es.all'
+    ports:
+      - "127.0.0.1:9114:9114"
+    networks:
+      - ott-data-net
+      - ott-network
+    restart: unless-stopped
+
+  # Kafka Exporter - Cluster Health, Partition Throughput & Consumer Group Lag
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:latest
+    container_name: ott-kafka-exporter
+    command:
+      - '--kafka.server=kafka-1:9092'
+      - '--kafka.server=kafka-2:9092'
+      - '--kafka.server=kafka-3:9092'
+    ports:
+      - "127.0.0.1:9308:9308"
+    networks:
+      - ott-data-net
+      - ott-network
+    restart: unless-stopped
+
+  # Nginx Prometheus Exporter - Edge Request Rates, Active Connections & Keepalive Status
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:latest
+    container_name: ott-nginx-exporter
+    command:
+      - '-nginx.scrape-uri=http://ott-nginx:80/stub_status'
+    ports:
+      - "127.0.0.1:9113:9113"
+    networks:
+      - ott-edge-net
+      - ott-network
+    restart: unless-stopped
+
+  # Blackbox Exporter - Synthetic External HTTP/TLS/DNS Probing
+  blackbox-exporter:
+    image: prom/blackbox-exporter:latest
+    container_name: ott-blackbox-exporter
+    volumes:
+      - ../monitoring/blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    command:
+      - '--config.file=/etc/blackbox_exporter/config.yml'
+    ports:
+      - "127.0.0.1:9115:9115"
+    networks:
+      - ott-edge-net
+      - ott-network
+    restart: unless-stopped

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ott-platform
+  labels:
+    app.kubernetes.io/name: ott-platform
+    app.kubernetes.io/part-of: ott-streaming-system

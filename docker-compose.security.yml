@@ -1,0 +1,100 @@
+# ==============================================================================
+# OTT Platform - Production Container Security Hardening (Overlay)
+# ==============================================================================
+# Apply via: docker compose -f docker-compose.yml -f docker-compose.security.yml up -d
+# Or automatically via COMPOSE_FILE in .env (or ./scripts/set-mode.sh prod)
+# ==============================================================================
+
+x-security-defaults: &security-defaults
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  read_only: true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+    - /app/logs:rw,noexec,nosuid,size=32m,mode=1777,uid=1001,gid=1001
+
+services:
+  # Microservices Hardening
+  auth-service:
+    <<: *security-defaults
+
+  user-service:
+    <<: *security-defaults
+
+  encoding-service:
+    <<: *security-defaults
+
+  content-service:
+    <<: *security-defaults
+
+  streaming-service:
+    <<: *security-defaults
+
+  live-service:
+    <<: *security-defaults
+
+  payment-service:
+    <<: *security-defaults
+
+  notification-service:
+    <<: *security-defaults
+
+  analytics-service:
+    <<: *security-defaults
+
+  api-gateway:
+    <<: *security-defaults
+
+  frontend:
+    <<: *security-defaults
+
+  # Databases & Edge Proxy Hardening
+  postgres:
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE
+
+  mongodb:
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE
+
+  redis:
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE
+
+  elasticsearch:
+    security_opt:
+      - no-new-privileges:true
+
+  nginx:
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - CHOWN
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE

@@ -76,8 +76,11 @@ export const uploadVideoHandler = async (
       port: urlObj.port || (urlObj.protocol === 'https:' ? 443 : 3003),
       path: urlObj.pathname + urlObj.search,
       method: 'POST',
-      headers: formData.getHeaders(),
-      timeout: 60000 // 60 second timeout
+      headers: {
+        ...formData.getHeaders(),
+        ...(req.user?.userId ? { 'x-user-id': req.user.userId } : {})
+      },
+      timeout: 3600000 // 1 hour timeout for large multi-gigabyte video uploads
     };
 
     console.log('[UPLOAD] Request options:', { hostname: options.hostname, port: options.port, path: options.path });
@@ -166,4 +169,58 @@ export const uploadVideoHandler = async (
     }
   }
 };
+
+const keepAliveHttpAgent = new http.Agent({ keepAlive: true, maxSockets: 100 });
+const keepAliveHttpsAgent = new https.Agent({ keepAlive: true, maxSockets: 100 });
+
+export const uploadChunkHandler = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  try {
+    const contentServiceUrl = process.env.CONTENT_SERVICE_URL || 'http://content-service:3003';
+    const urlObj = new URL(`${contentServiceUrl}/api/content/upload/chunk`);
+    const isHttps = urlObj.protocol === 'https:';
+    const protocol = isHttps ? https : http;
+    const agent = isHttps ? keepAliveHttpsAgent : keepAliveHttpAgent;
+
+    const queryString = req.url && req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
+    const forwardPath = urlObj.pathname + queryString;
+
+    const forwardHeaders: Record<string, any> = { ...req.headers };
+    forwardHeaders.host = `${urlObj.hostname}:${urlObj.port || (isHttps ? 443 : 3003)}`;
+    if (req.user?.userId) {
+      forwardHeaders['x-user-id'] = req.user.userId;
+    }
+
+    const proxyReq = protocol.request({
+      hostname: urlObj.hostname,
+      port: urlObj.port || (isHttps ? 443 : 3003),
+      path: forwardPath,
+      method: 'POST',
+      agent,
+      headers: forwardHeaders,
+      timeout: 300000
+    }, (proxyRes) => {
+      res.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
+      proxyRes.pipe(res);
+    });
+
+    proxyReq.on('error', (err) => {
+      console.error('[GATEWAY] Chunk stream error:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ status: 'error', message: err.message, statusCode: 500 });
+      }
+    });
+
+    req.pipe(proxyReq);
+  } catch (error: any) {
+    console.error('[GATEWAY] Chunk forwarding error:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ status: 'error', message: error.message, statusCode: 500 });
+    }
+  }
+};
+
 

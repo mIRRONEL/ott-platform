@@ -1,0 +1,283 @@
+# ==============================================================================
+# OTT Platform - Dedicated Container Resource Allocation & Limits (Overlay)
+# ==============================================================================
+# Apply via: docker compose -f docker-compose.yml -f docker-compose.resources.yml up -d
+# Or automatically via COMPOSE_FILE in .env (or ./scripts/set-mode.sh prod)
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # TIER 1: HIGH-THROUGHPUT MEDIA PIPELINE & GATEWAY
+  # ----------------------------------------------------------------------------
+  encoding-service:
+    deploy:
+      resources:
+        limits:
+          cpus: '3.50'
+          memory: 4096M
+        reservations:
+          cpus: '0.50'
+          memory: 512M
+
+  content-service:
+    deploy:
+      resources:
+        limits:
+          cpus: '3.00'
+          memory: 2048M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  nginx:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.50'
+          memory: 1024M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  api-gateway:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.00'
+          memory: 1024M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  live-service:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.50'
+          memory: 1024M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  streaming-service:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.50'
+          memory: 1024M
+        reservations:
+          cpus: '0.20'
+          memory: 128M
+
+  # ----------------------------------------------------------------------------
+  # TIER 2: PERSISTENCE, SEARCH & EVENT BUS (DATABASES & KAFKA)
+  # ----------------------------------------------------------------------------
+  elasticsearch:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.00'
+          memory: 1536M
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+  mongodb:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.50'
+          memory: 1024M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  postgres:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.50'
+          memory: 1024M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  kafka-1:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.50'
+          memory: 1024M
+        reservations:
+          cpus: '0.20'
+          memory: 256M
+
+  kafka-2:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.50'
+          memory: 1024M
+        reservations:
+          cpus: '0.20'
+          memory: 256M
+
+  kafka-3:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.50'
+          memory: 1024M
+        reservations:
+          cpus: '0.20'
+          memory: 256M
+
+  redis:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 768M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
+
+  kafka-init:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+
+  encoding-volume-init:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 128M
+
+  # ----------------------------------------------------------------------------
+  # TIER 3: CORE APPLICATION MICROSERVICES & WEB FRONTEND
+  # ----------------------------------------------------------------------------
+  auth-service:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 768M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
+
+  user-service:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 768M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
+
+  payment-service:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 768M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
+
+  notification-service:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 768M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
+
+  analytics-service:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 768M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
+
+  frontend:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 64M
+
+  # ----------------------------------------------------------------------------
+  # TIER 4: OBSERVABILITY, TELEMETRY & LOGGING STACK
+  # ----------------------------------------------------------------------------
+  prometheus:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 768M
+        reservations:
+          cpus: '0.10'
+          memory: 128M
+
+  grafana:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 64M
+
+  loki:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 512M
+        reservations:
+          cpus: '0.10'
+          memory: 64M
+
+  promtail:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+        reservations:
+          cpus: '0.05'
+          memory: 32M
+
+  cadvisor:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+        reservations:
+          cpus: '0.05'
+          memory: 32M
+
+  node-exporter:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.05'
+          memory: 16M

@@ -1,3 +1,4 @@
+import "./utils/secrets";
 import express, { Application, Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -6,6 +7,7 @@ import dotenv from 'dotenv';
 import userRoutes from './routes/user.routes';
 import { errorHandler } from './middleware/error.handler';
 import { logger } from './utils/logger';
+import { metricsRegistry, metricsMiddleware } from './utils/metrics';
 
 dotenv.config();
 
@@ -15,6 +17,25 @@ const PORT = process.env.PORT || 3002;
 // Trust proxy
 app.set('trust proxy', 1);
 
+// Prometheus Metrics Middleware
+app.use(metricsMiddleware);
+
+// Prometheus Metrics Endpoint
+app.get('/metrics', (req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+  res.send(metricsRegistry.getMetrics());
+});
+
+// Health check endpoint
+app.get('/health', (req: Request, res: Response) => {
+  res.status(200).json({
+    status: 'UP',
+    service: 'user-service',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
 // Security middleware
 app.use(helmet());
 app.use(cors({
@@ -22,11 +43,16 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting
+// Rate limiting - Gateway traffic with internal secret is whitelisted
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests, please try again later.'
+  max: 1000,
+  message: 'Too many requests, please try again later.',
+  skip: (req: Request) => {
+    const secret = req.headers['x-internal-service-secret'];
+    if (secret && secret === process.env.INTERNAL_SERVICE_SECRET) return true;
+    return req.path === '/health' || req.path === '/metrics';
+  }
 });
 app.use(limiter);
 
@@ -41,16 +67,6 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     userAgent: req.get('user-agent')
   });
   next();
-});
-
-// Health check endpoint
-app.get('/health', (req: Request, res: Response) => {
-  res.status(200).json({
-    status: 'UP',
-    service: 'user-service',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
 });
 
 // API routes

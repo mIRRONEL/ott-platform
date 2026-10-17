@@ -1,3 +1,4 @@
+import "./utils/secrets";
 import express, { Application, Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -9,6 +10,7 @@ import { errorHandler } from './middleware/error.handler';
 import { logger } from './utils/logger';
 import { initializeKafkaConsumer } from './kafka/consumer';
 import { swaggerSpec } from './config/swagger';
+import { metricsRegistry, metricsMiddleware } from './utils/metrics';
 
 dotenv.config();
 
@@ -16,6 +18,24 @@ const app: Application = express();
 const PORT = process.env.PORT || 3006;
 
 app.set('trust proxy', 1);
+
+// Prometheus Metrics Middleware
+app.use(metricsMiddleware);
+
+// Prometheus Metrics Endpoint
+app.get('/metrics', (req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+  res.send(metricsRegistry.getMetrics());
+});
+
+app.get('/health', (req: Request, res: Response) => {
+  res.status(200).json({
+    status: 'UP',
+    service: 'notification-service',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
 
 app.use(helmet());
 app.use(cors({
@@ -25,8 +45,13 @@ app.use(cors({
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: 'Too many requests, please try again later.'
+  max: 1000,
+  message: 'Too many requests, please try again later.',
+  skip: (req: Request) => {
+    const secret = req.headers['x-internal-service-secret'];
+    if (secret && secret === process.env.INTERNAL_SERVICE_SECRET) return true;
+    return req.path === '/health' || req.path === '/metrics';
+  }
 });
 
 app.use(limiter);
@@ -40,38 +65,6 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   });
   next();
 });
-
-app.get('/health', (req: Request, res: Response) => {
-  res.status(200).json({
-    status: 'UP',
-    service: 'notification-service',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
-});
-
-// Simple endpoints for frontend
-app.get('/api/notifications', (req: Request, res: Response) => {
-  res.json({
-    data: [{
-      id: '1',
-      title: 'Welcome',
-      message: 'Welcome to OTT Platform!',
-      type: 'info',
-      read: false,
-      createdAt: new Date().toISOString()
-    }]
-  });
-});
-
-app.put('/api/notifications/:notificationId/read', (req: Request, res: Response) => {
-  res.json({ success: true, message: 'Notification marked as read' });
-});
-
-app.delete('/api/notifications/:notificationId', (req: Request, res: Response) => {
-  res.json({ success: true, message: 'Notification deleted' });
-});
-
 
 // API Documentation
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));

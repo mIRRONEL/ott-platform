@@ -1,0 +1,40 @@
+# ==============================================================================
+# OTT Platform - Web Frontend & Edge Reverse Proxy Tier
+# ==============================================================================
+# Services: Frontend (React / Vite), Nginx (Unified Edge & HLS Cache)
+# ==============================================================================
+
+services:
+  # Frontend with node serve
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 5173
+    ports:
+      - "5173:5173"
+    networks:
+      - ott-edge-net
+      - ott-network
+    restart: unless-stopped
+
+  # Unified Edge Reverse Proxy & HLS Cache
+  nginx:
+    image: nginx:alpine
+    container_name: ott-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ../infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../infra/nginx/conf.d:/etc/nginx/conf.d:ro
+      - nginx_cache:/var/cache/nginx
+    networks:
+      - ott-edge-net
+      - ott-network
+    depends_on:
+      - frontend
+      - api-gateway
+      - content-service
+    restart: unless-stopped

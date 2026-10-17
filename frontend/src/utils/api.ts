@@ -1,6 +1,16 @@
 import { useAuthStore } from '../stores/auth';
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:3000/api';
+// Use environment variable if set (build-time), otherwise use current host
+const getApiUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL as string;
+  if (envUrl) return envUrl;
+  
+  // Dynamically use the current host with port 3000
+  const host = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+  return `http://${host}:3000/api`;
+};
+
+const API_BASE_URL = getApiUrl();
 
 export interface ApiResponse<T = any> {
   data?: T;

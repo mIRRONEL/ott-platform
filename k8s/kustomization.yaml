@@ -1,0 +1,49 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ott-platform
+
+resources:
+  # 00 Core Namespace
+  - 00-namespace.yaml
+
+  # 01 Configurations & Secrets
+  - 01-configmap-secrets.yaml
+
+  # 02 Storage & Persistent Volume Claims
+  - 02-storage-pvcs.yaml
+
+  # 03 Stateful Databases
+  - 03-databases/postgres.yaml
+  - 03-databases/mongodb.yaml
+  - 03-databases/redis.yaml
+  - 03-databases/elasticsearch.yaml
+
+  # 04 Kafka Cluster (KRaft 3-Node Quorum)
+  - 04-kafka/kafka-kraft.yaml
+
+  # 05 Application Microservices Tier
+  - 05-microservices/api-gateway.yaml
+  - 05-microservices/auth-service.yaml
+  - 05-microservices/user-service.yaml
+  - 05-microservices/content-service.yaml
+  - 05-microservices/streaming-service.yaml
+  - 05-microservices/encoding-service.yaml
+  - 05-microservices/live-service.yaml
+  - 05-microservices/payment-service.yaml
+  - 05-microservices/notification-service.yaml
+  - 05-microservices/analytics-service.yaml
+
+  # 06 Frontend UI
+  - 06-frontend/frontend.yaml
+
+  # 07 Ingress & Traffic Management
+  - 07-ingress/ingress.yaml
+
+  # 08 Observability & Monitoring
+  - 08-monitoring/prometheus.yaml
+  - 08-monitoring/alertmanager.yaml
+  - 08-monitoring/grafana.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: ott-platform

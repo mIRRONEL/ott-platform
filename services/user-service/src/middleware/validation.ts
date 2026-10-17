@@ -1,28 +1,64 @@
 import { Request, Response, NextFunction } from 'express';
-import { Schema, ValidationError as JoiValidationError } from 'joi';
+import { Schema } from 'joi';
 import { ValidationError } from '../utils/errors';
-import { logger } from '../utils/logger';
 
 export const validateRequest = (schema: any) => {
   return (req: Request, res: Response, next: NextFunction) => {
     try {
-      const toValidate = {
-        body: req.body,
-        params: req.params,
-        query: req.query
-      };
+      if (!schema) return next();
 
-      const { error, value } = (schema.body || schema).validate(req.body, {
-        abortEarly: false,
-        stripUnknown: true
-      });
-
-      if (error) {
-        const messages = error.details.map(detail => detail.message).join(', ');
-        throw new ValidationError(messages);
+      if (schema.body) {
+        const { error, value } = schema.body.validate(req.body, {
+          abortEarly: false,
+          stripUnknown: true
+        });
+        if (error) {
+          const messages = error.details.map((d: any) => d.message).join(', ');
+          throw new ValidationError(messages);
+        }
+        req.body = value;
+        return next();
       }
 
-      req.body = value;
+      if (schema.query) {
+        const { error, value } = schema.query.validate(req.query, {
+          abortEarly: false,
+          stripUnknown: true
+        });
+        if (error) {
+          const messages = error.details.map((d: any) => d.message).join(', ');
+          throw new ValidationError(messages);
+        }
+        req.query = value;
+        return next();
+      }
+
+      if (schema.params) {
+        const { error, value } = schema.params.validate(req.params, {
+          abortEarly: false,
+          stripUnknown: true
+        });
+        if (error) {
+          const messages = error.details.map((d: any) => d.message).join(', ');
+          throw new ValidationError(messages);
+        }
+        req.params = value;
+        return next();
+      }
+
+      if (typeof schema.validate === 'function') {
+        const { error, value } = schema.validate(req.body, {
+          abortEarly: false,
+          stripUnknown: true
+        });
+        if (error) {
+          const messages = error.details.map((d: any) => d.message).join(', ');
+          throw new ValidationError(messages);
+        }
+        req.body = value;
+        return next();
+      }
+
       next();
     } catch (err) {
       next(err);

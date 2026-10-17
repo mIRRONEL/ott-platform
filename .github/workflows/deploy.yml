@@ -1,0 +1,119 @@
+name: OTT Platform - Production Zero-Downtime Deployment (CD)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Target service to deploy (or "all" for full platform)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - frontend
+          - api-gateway
+          - live-service
+          - streaming-service
+          - content-service
+          - auth-service
+          - user-service
+          - encoding-service
+          - payment-service
+          - notification-service
+          - analytics-service
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: 🚀 Production Zero-Downtime Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Deploy to Production Host via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_HOST || '180.94.20.40' }}
+          username: ${{ secrets.PROD_USER || 'almalinux' }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          port: ${{ secrets.PROD_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -e
+            echo "================================================================"
+            echo "  🚀 Starting Production Zero-Downtime Deployment Pipeline"
+            echo "================================================================"
+            cd /home/almalinux/ott-app
+
+            # 1. Sync repository
+            echo "▶ Pulling latest code changes from origin..."
+            git pull origin main
+
+            # 2. Determine target services
+            TARGET_SERVICE="${{ github.event.inputs.service || 'changed' }}"
+
+            if [ "$TARGET_SERVICE" = "all" ]; then
+              echo "▶ Full Platform Zero-Downtime Rolling Update initiated..."
+              SERVICES=("auth-service" "user-service" "content-service" "streaming-service" "live-service" "payment-service" "notification-service" "analytics-service" "encoding-service" "api-gateway" "frontend")
+              for svc in "${SERVICES[@]}"; do
+                echo "▶ Rolling update for: $svc"
+                ./scripts/deploy.sh "$svc"
+              done
+            elif [ "$TARGET_SERVICE" != "changed" ]; then
+              echo "▶ Deploying targeted service: $TARGET_SERVICE"
+              ./scripts/deploy.sh "$TARGET_SERVICE"
+            else
+              echo "▶ Detecting changed microservices from recent git commits..."
+              CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD || true)
+              
+              SERVICES=("auth-service" "user-service" "content-service" "streaming-service" "live-service" "payment-service" "notification-service" "analytics-service" "encoding-service" "api-gateway" "frontend")
+              
+              DEPLOYED_COUNT=0
+              for svc in "${SERVICES[@]}"; do
+                if echo "$CHANGED_FILES" | grep -q "services/$svc\|frontend"; then
+                  echo "▶ Detected changes in $svc. Deploying..."
+                  ./scripts/deploy.sh "$svc"
+                  DEPLOYED_COUNT=$((DEPLOYED_COUNT + 1))
+                fi
+              done
+
+              if [ "$DEPLOYED_COUNT" -eq 0 ]; then
+                echo "ℹ No microservice files changed. Running frontend check..."
+                ./scripts/deploy.sh frontend
+              fi
+            fi
+
+            # 3. Post-Deployment Smoke Tests
+            echo "================================================================"
+            echo "  🧪 Running Post-Deployment Health & Smoke Tests"
+            echo "================================================================"
+            
+            check_endpoint() {
+              URL=$1
+              NAME=$2
+              echo -n "Checking $NAME ($URL)... "
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || echo "000")
+              if [ "$STATUS" = "200" ]; then
+                echo "✓ OK (HTTP 200)"
+              else
+                echo "❌ FAILED (HTTP $STATUS)"
+                exit 1
+              fi
+            }
+
+            check_endpoint "http://127.0.0.1/api/auth/health" "Auth Service"
+            check_endpoint "http://127.0.0.1/api/live/channels" "Live Ingest Service"
+            check_endpoint "http://127.0.0.1/api/content/videos" "Content Service"
+            check_endpoint "http://127.0.0.1/health" "Frontend Web App"
+
+            echo "================================================================"
+            echo "  🎉 Production Deployment Verified 100% Operational!"
+            echo "================================================================"

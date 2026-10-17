@@ -1,0 +1,61 @@
+#!/usr/bin/env bpftrace
+/*
+ * trace-packet-drops.bt - eBPF Service-to-Service & Container Packet Drop Tracer
+ *
+ * Hooks into kernel packet disposal (kfree_skb) and TCP retransmission paths
+ * to detect dropped, corrupted, or deliberately filtered network packets
+ * between microservices, containers, and external clients.
+ *
+ * Usage:
+ *   sudo bpftrace scripts/ebpf/trace-packet-drops.bt
+ */
+
+BEGIN
+{
+  printf("Tracing kernel packet drops and service-to-service retransmits... Hit Ctrl-C to stop.\n\n");
+}
+
+// 1. Trace TCP socket drops and retransmissions (Indicators of deliberate or network packet loss)
+tracepoint:tcp:tcp_retransmit_skb
+{
+  if (args.family == 2) {
+    printf("[!] TCP Drop / Retransmit: %s:%d -> %s:%d (Process: %s)\n",
+      ntop(2, args.saddr), args.sport, ntop(2, args.daddr), args.dport, comm);
+    @tcp_drops_by_dest[ntop(2, args.daddr), args.dport] = count();
+    @tcp_drops_by_src[ntop(2, args.saddr), args.sport] = count();
+    @tcp_drops_by_process[comm] = count();
+  }
+}
+
+// 2. Trace kernel SKB free events triggered by drops
+tracepoint:skb:kfree_skb
+{
+  @kernel_drops_by_location[kstack(1)] = count();
+}
+
+interval:s:5
+{
+  printf("\n=== Service-to-Service Packet Drop Summary (Last 5s) ===\n");
+  printf("Top Destination Endpoints experiencing Drops / Retransmits:\n");
+  print(@tcp_drops_by_dest);
+
+  printf("\nTop Source Microservices experiencing Drops / Retransmits:\n");
+  print(@tcp_drops_by_src);
+
+  printf("\nProcesses Impacted by Packet Loss:\n");
+  print(@tcp_drops_by_process);
+
+  clear(@tcp_drops_by_dest);
+  clear(@tcp_drops_by_src);
+  clear(@tcp_drops_by_process);
+  clear(@kernel_drops_by_location);
+}
+
+END
+{
+  printf("\nDetaching packet drop probes. Cleaning up...\n");
+  clear(@tcp_drops_by_dest);
+  clear(@tcp_drops_by_src);
+  clear(@tcp_drops_by_process);
+  clear(@kernel_drops_by_location);
+}

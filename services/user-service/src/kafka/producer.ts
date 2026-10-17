@@ -1,16 +1,21 @@
-import { Kafka, Producer } from 'kafkajs';
+import { Kafka, Partitioners, Producer } from 'kafkajs';
 import { logger } from '../utils/logger';
 
 const kafka = new Kafka({
   clientId: 'user-service',
-  brokers: (process.env.KAFKA_BROKERS || 'localhost:9092').split(','),
+  brokers: (process.env.KAFKA_BROKERS || 'localhost:9092,localhost:9094,localhost:9096').split(','),
   retry: {
-    initialRetryTime: 100,
-    retries: 8
-  }
+    initialRetryTime: parseInt(process.env.KAFKA_RETRY_INITIAL_RETRY_TIME || '100'),
+    retries: Number.MAX_SAFE_INTEGER,
+    maxRetryTime: 30000,
+    multiplier: 2,
+  },
+  connectionTimeout: parseInt(process.env.KAFKA_CONNECT_TIMEOUT || '15000'),
+  requestTimeout: parseInt(process.env.KAFKA_REQUEST_TIMEOUT || '30000'),
 });
 
 export const kafkaProducer: Producer = kafka.producer({
+  createPartitioner: Partitioners.LegacyPartitioner,
   idempotent: true,
   maxInFlightRequests: 5,
 });

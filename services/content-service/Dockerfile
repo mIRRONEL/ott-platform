@@ -19,22 +19,21 @@ WORKDIR /app
 
 RUN apk add --no-cache dumb-init ffmpeg
 
-COPY package.json package-lock.json ./
+RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 
-RUN npm ci --only=production
+COPY --chown=nodejs:nodejs package.json package-lock.json ./
 
-COPY --from=builder /app/dist ./dist
+RUN npm ci --legacy-peer-deps --omit=dev && npm cache clean --force
+
+COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 
 # Create logs directory with proper permissions
-RUN mkdir -p /app/logs && chmod 777 /app/logs && \
-    mkdir -p /tmp/ott-uploads && chmod 777 /tmp/ott-uploads && \
-    mkdir -p /tmp/ott-hls && chmod 777 /tmp/ott-hls
+RUN mkdir -p /app/logs && chown nodejs:nodejs /app/logs && chmod 750 /app/logs && \
+    mkdir -p /tmp/ott-uploads && chown nodejs:nodejs /tmp/ott-uploads && chmod 750 /tmp/ott-uploads && \
+    mkdir -p /tmp/ott-hls && chown nodejs:nodejs /tmp/ott-hls && chmod 750 /tmp/ott-hls
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3003/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
-
-RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001 && \
-    chown -R nodejs:nodejs /app /tmp/ott-uploads /tmp/ott-hls
 
 USER nodejs
 

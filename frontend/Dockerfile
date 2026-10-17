@@ -1,42 +1,41 @@
 # Build stage
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
-COPY package.json ./
+COPY package.json package-lock.json ./
 
-# Install dependencies
-RUN npm install
+RUN npm ci
 
-# Copy source code
 COPY . .
 
-# Build the application
 RUN npm run build
 
+
 # Production stage
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy built files from builder
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package.json ./
-COPY --from=builder /app/node_modules ./node_modules
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs \
+    && adduser -S nodejs -u 1001
 
 # Install serve
-RUN npm install -g serve
+RUN npm install -g serve \
+    && npm cache clean --force
 
-# Expose port
-EXPOSE 5173
+# Copy only production build
+COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 
-# Set environment
+# Run as non-root
+USER nodejs
+
 ENV NODE_ENV=production
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:5173', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+EXPOSE 5173
 
-# Serve the built app
+HEALTHCHECK --interval=15s --timeout=10s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://127.0.0.1:5173', (r) => { if (r.statusCode !== 200) process.exit(1) })"
+
 CMD ["serve", "-s", "dist", "-l", "5173"]

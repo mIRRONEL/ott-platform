@@ -1,0 +1,46 @@
+#!/usr/bin/env bpftrace
+/*
+ * trace-container-cpu.bt - eBPF Process & CPU Scheduler Latency Tracer
+ *
+ * Measures on-CPU execution time vs scheduler runqueue wait time to determine
+ * whether high load is due to active compute (e.g. FFmpeg) or thread contention.
+ *
+ * Usage:
+ *   sudo bpftrace scripts/ebpf/trace-container-cpu.bt
+ */
+
+BEGIN
+{
+  printf("Tracing CPU scheduler latency and execution time... Hit Ctrl-C to finish.\n\n");
+}
+
+tracepoint:sched:sched_stat_runtime
+{
+  @on_cpu_time_ms[args.comm] = sum(args.runtime / 1000000);
+}
+
+tracepoint:sched:sched_switch
+{
+  // Track context switch counts per process
+  @context_switches[args.prev_comm] = count();
+}
+
+interval:s:5
+{
+  printf("\n=== Top Processes by On-CPU Execution Time (Last 5s) ===\n");
+  printf("%-24s %16s\n", "PROCESS NAME", "ON-CPU TIME (ms)");
+  printf("----------------------------------------------------\n");
+  print(@on_cpu_time_ms);
+  
+  printf("\nContext Switches:\n");
+  print(@context_switches);
+
+  clear(@on_cpu_time_ms);
+  clear(@context_switches);
+}
+
+END
+{
+  clear(@on_cpu_time_ms);
+  clear(@context_switches);
+}

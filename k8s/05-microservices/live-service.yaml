@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: live-service
+  namespace: ott-platform
+  labels:
+    app: live-service
+    tier: streaming
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: live-service
+  template:
+    metadata:
+      labels:
+        app: live-service
+        tier: streaming
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3009"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: live-service
+          image: ott-live-service:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: ott-config
+            - secretRef:
+                name: ott-secrets
+          env:
+            - name: PORT
+              value: "3009"
+            - name: RTMP_PORT
+              value: "1935"
+            - name: NODE_OPTIONS
+              value: "--max-old-space-size=512"
+          ports:
+            - containerPort: 3009
+              name: http
+            - containerPort: 8000
+              name: http-flv
+            - containerPort: 1935
+              name: rtmp
+          volumeMounts:
+            - name: video-storage
+              mountPath: /videos
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3009
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3009
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1024Mi
+      volumes:
+        - name: video-storage
+          persistentVolumeClaim:
+            claimName: videos-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: live-service
+  namespace: ott-platform
+  labels:
+    app: live-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3009
+      targetPort: 3009
+      name: http
+    - port: 8000
+      targetPort: 8000
+      name: http-flv
+  selector:
+    app: live-service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: live-service-rtmp
+  namespace: ott-platform
+  labels:
+    app: live-service
+spec:
+  type: NodePort
+  ports:
+    - port: 1935
+      targetPort: 1935
+      nodePort: 31935
+      name: rtmp
+  selector:
+    app: live-service

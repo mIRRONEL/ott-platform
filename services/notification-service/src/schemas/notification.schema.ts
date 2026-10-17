@@ -31,11 +31,14 @@ export const sendNotificationSchema = {
   body: Joi.object({
     userId: Joi.string().required(),
     type: Joi.string()
-      .valid('email', 'sms', 'push')
-      .required(),
-    templateId: Joi.string().required(),
+      .valid('email', 'sms', 'push', 'info', 'success', 'warning', 'error')
+      .optional()
+      .default('info'),
+    templateId: Joi.string().optional().default('general'),
+    title: Joi.string().max(255).optional(),
     subject: Joi.string().max(255).optional(),
-    recipient: Joi.string().required(),
+    message: Joi.string().optional(),
+    recipient: Joi.string().optional(),
     templateData: Joi.object().optional(),
     priority: Joi.string()
       .valid('low', 'normal', 'high')

@@ -77,7 +77,7 @@ export const sendPushNotification = async (
     };
 
     // Send to all user devices
-    const response = await admin.messaging().sendMulticast({
+    const response = await admin.messaging().sendEachForMulticast({
       tokens: userTokens,
       notification,
       data: data as any

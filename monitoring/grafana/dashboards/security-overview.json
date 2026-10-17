@@ -1,0 +1,687 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": true,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "title": "🛡️ Application Security & Access Threat Overview",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "orange", "value": 2 },
+              { "color": "red", "value": 5 }
+            ]
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 1 },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.3.3",
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{status_code=\"401\"}[1m])) or vector(0)",
+          "legendFormat": "401 Rate",
+          "refId": "A"
+        }
+      ],
+      "title": "401 Unauthorized (Auth Failures)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "orange", "value": 2 },
+              { "color": "red", "value": 5 }
+            ]
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 4, "y": 1 },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.3.3",
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{status_code=\"403\"}[1m])) or vector(0)",
+          "legendFormat": "403 Rate",
+          "refId": "A"
+        }
+      ],
+      "title": "403 Forbidden (Access Denied)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "orange", "value": 5 },
+              { "color": "red", "value": 10 }
+            ]
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 8, "y": 1 },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.3.3",
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{status_code=\"429\"}[1m])) or vector(0)",
+          "legendFormat": "429 Rate",
+          "refId": "A"
+        }
+      ],
+      "title": "429 Rate Limit Breaches",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "orange", "value": 2 },
+              { "color": "red", "value": 5 }
+            ]
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 12, "y": 1 },
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.3.3",
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{status_code=~\"5..\"}[1m])) or vector(0)",
+          "legendFormat": "5xx Rate",
+          "refId": "A"
+        }
+      ],
+      "title": "5xx Server Errors (Exploits/Faults)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 5 },
+              { "color": "red", "value": 20 }
+            ]
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 16, "y": 1 },
+      "id": 6,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.3.3",
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{status_code=~\"[45]..\"}[1m])) or vector(0)",
+          "legendFormat": "Total Threat RPS",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Security Event Rate (4xx + 5xx)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 85 },
+              { "color": "yellow", "value": 95 },
+              { "color": "green", "value": 99 }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 20, "y": 1 },
+      "id": 7,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.3.3",
+      "targets": [
+        {
+          "expr": "clamp_min(100 - (((sum(rate(http_requests_total{status_code=~\"[45]..\"}[1m])) or vector(0)) / (sum(rate(http_requests_total[1m])) > 0 or vector(1))) * 100), 0)",
+          "legendFormat": "Security Score",
+          "refId": "A"
+        }
+      ],
+      "title": "Security Health Score",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "id": 8,
+      "title": "📈 Threat Vectors & Traffic Anomaly Time Series",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "gradientMode": "opacity",
+            "spanNulls": false,
+            "showPoints": "never",
+            "stacking": { "group": "A", "mode": "none" }
+          },
+          "unit": "reqps"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": ".*401.*" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": ".*403.*" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": ".*429.*" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "purple", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": ".*50.*" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
+      "id": 9,
+      "options": {
+        "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "10.3.3",
+      "targets": [
+        {
+          "expr": "sum by (status_code) (rate(http_requests_total{status_code=~\"[45]..\"}[1m]))",
+          "legendFormat": "HTTP {{status_code}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Security Anomalies by HTTP Status Code",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "gradientMode": "opacity",
+            "spanNulls": false,
+            "showPoints": "never"
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
+      "id": 10,
+      "options": {
+        "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "10.3.3",
+      "targets": [
+        {
+          "expr": "sum by (service) (rate(http_requests_total{status_code=~\"40[13]|429\"}[1m]))",
+          "legendFormat": "{{service}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Authentication & Rate Limit Pressure by Microservice",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
+      "id": 11,
+      "title": "🎯 Attack Surface & Targeted Routes",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "align": "auto", "displayMode": "auto", "inspect": false },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          },
+          "unit": "reqps"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Value" },
+            "properties": [{ "id": "custom.displayMode", "value": "color-background" }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "id": 12,
+      "options": {
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "Value" }]
+      },
+      "pluginVersion": "10.3.3",
+      "targets": [
+        {
+          "expr": "topk(10, sum by (service, method, route, status_code) (rate(http_requests_total{status_code=~\"[45]..\"}[5m])))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{service}} {{method}} {{route}} [{{status_code}}]",
+          "refId": "A"
+        }
+      ],
+      "title": "Top Targeted Routes Experiencing 4xx/5xx Blocks",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true },
+            "renameByName": {
+              "method": "HTTP Method",
+              "route": "Endpoint Route",
+              "service": "Microservice",
+              "status_code": "Status",
+              "Value": "Error Rate (req/s)"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "hideFrom": { "legend": false, "tooltip": false, "viz": false } },
+          "mappings": []
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": ".*20.*" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": ".*401.*" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": ".*403.*" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": ".*429.*" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "purple", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": ".*50.*" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 16 },
+      "id": 13,
+      "options": {
+        "displayLabels": ["percent"],
+        "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] },
+        "pieType": "donut",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "tooltip": { "mode": "single", "sort": "desc" }
+      },
+      "pluginVersion": "10.3.3",
+      "targets": [
+        {
+          "expr": "sum by (status_code) (increase(http_requests_total[1h]))",
+          "legendFormat": "HTTP {{status_code}}",
+          "refId": "A"
+        }
+      ],
+      "title": "HTTP Status Distribution (Last 1h)",
+      "type": "piechart"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 10 },
+              { "color": "orange", "value": 50 },
+              { "color": "red", "value": 100 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 16 },
+      "id": 14,
+      "options": {
+        "displayMode": "gradient",
+        "minVizHeight": 10,
+        "minVizWidth": 0,
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showUnfilled": true
+      },
+      "pluginVersion": "10.3.3",
+      "targets": [
+        {
+          "expr": "sum by (service) (increase(http_requests_total{status_code=~\"[45]..\"}[1h]))",
+          "legendFormat": "{{service}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Security Events by Service (Last 1h)",
+      "type": "bargauge"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+      "id": 15,
+      "title": "🌐 Service-to-Service Communication & Packet Drop Monitor",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "gradientMode": "opacity",
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 10 }
+            ]
+          },
+          "unit": "pps"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 25 },
+      "id": 16,
+      "options": {
+        "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "10.3.3",
+      "targets": [
+        {
+          "expr": "sum by (interface) (rate(container_network_transmit_packets_dropped_total[1m]))",
+          "legendFormat": "TX Drops ({{interface}})",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (interface) (rate(container_network_receive_packets_dropped_total[1m]))",
+          "legendFormat": "RX Drops ({{interface}})",
+          "refId": "B"
+        }
+      ],
+      "title": "Container Packet Drops (TX / RX Dropped/s)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "gradientMode": "opacity",
+            "showPoints": "never"
+          },
+          "unit": "errors/s"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 25 },
+      "id": 17,
+      "options": {
+        "legend": { "calcs": ["mean", "max", "lastNotNull"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "pluginVersion": "10.3.3",
+      "targets": [
+        {
+          "expr": "sum by (interface) (rate(container_network_transmit_errors_total[1m]))",
+          "legendFormat": "TX Errors ({{interface}})",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (interface) (rate(container_network_receive_errors_total[1m]))",
+          "legendFormat": "RX Errors ({{interface}})",
+          "refId": "B"
+        }
+      ],
+      "title": "Container Network Stack Errors",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "orange", "value": 2 },
+              { "color": "red", "value": 5 }
+            ]
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 25 },
+      "id": 18,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.3.3",
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{status_code=~\"50[24]\"}[1m])) or vector(0)",
+          "legendFormat": "Inter-Service Drop / Timeout Rate",
+          "refId": "A"
+        }
+      ],
+      "title": "Inter-Service Timeout / Bad Gateway Drops (502/504)",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 33 },
+      "id": 19,
+      "title": "📜 Live Security Audit & Anomaly Log Stream (Loki)",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 34 },
+      "id": 20,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "pluginVersion": "10.3.3",
+      "targets": [
+        {
+          "expr": "{job=\"docker\"} |~ \"(?i)(401|403|429|failed|unauthorized|forbidden|token|attack|error|warn|abuse|exploit|invalid|drop|timeout|reset|refused)\"",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Real-Time Security Audit & Threat Logs",
+      "type": "logs"
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 39,
+  "tags": ["security", "threat-intelligence", "ott-platform", "audit"],
+  "templating": { "list": [] },
+  "time": { "from": "now-30m", "to": "now" },
+  "timepicker": {
+    "refresh_intervals": ["5s", "10s", "30s", "1m", "5m"]
+  },
+  "timezone": "browser",
+  "title": "OTT Platform - Application Security & Threat Intelligence",
+  "uid": "ott-app-security",
+  "version": 1,
+  "weekStart": ""
+}

@@ -14,7 +14,7 @@ export const kafka = new Kafka({
     maxRetryTime: 30000,
     initialRetryTime: 100,
     multiplier: 2,
-    retries: 8,
+    retries: parseInt(process.env.KAFKA_PRODUCER_RETRIES || String(Number.MAX_SAFE_INTEGER)),
   },
 });
 

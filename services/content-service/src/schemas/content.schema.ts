@@ -4,8 +4,8 @@ export const createVideoSchema = {
   body: Joi.object({
     title: Joi.string().required().max(255),
     description: Joi.string().required().max(2000),
-    thumbnail: Joi.string().uri().required(),
-    posterImage: Joi.string().uri().optional(),
+    thumbnail: Joi.string().optional().allow('', null),
+    posterImage: Joi.string().optional().allow('', null),
     duration: Joi.number().required().positive(),
     category: Joi.string().required().max(50),
     subCategory: Joi.string().optional().max(50),
@@ -31,8 +31,8 @@ export const updateVideoSchema = {
   body: Joi.object({
     title: Joi.string().max(255).optional(),
     description: Joi.string().max(2000).optional(),
-    thumbnail: Joi.string().uri().optional(),
-    posterImage: Joi.string().uri().optional(),
+    thumbnail: Joi.string().optional().allow('', null),
+    posterImage: Joi.string().optional().allow('', null),
     category: Joi.string().max(50).optional(),
     subCategory: Joi.string().max(50).optional(),
     director: Joi.string().max(255).optional(),

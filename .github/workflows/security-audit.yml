@@ -1,0 +1,57 @@
+name: OTT Platform - Security & Vulnerability Audit
+
+on:
+  schedule:
+    - cron: '0 4 * * 1' # Run every Monday at 4:00 AM UTC
+  workflow_dispatch:
+
+jobs:
+  security-audit:
+    name: 🛡️ Dependency Vulnerability Audit
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        directory:
+          - frontend
+          - services/api-gateway
+          - services/auth-service
+          - services/user-service
+          - services/content-service
+          - services/streaming-service
+          - services/live-service
+          - services/payment-service
+          - services/notification-service
+          - services/analytics-service
+          - services/encoding-service
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run NPM Audit (${{ matrix.directory }})
+        working-directory: ${{ matrix.directory }}
+        run: |
+          echo "Scanning dependencies in ${{ matrix.directory }}..."
+          npm audit --audit-level=high || true
+
+  trivy-security-scan:
+    name: 🔍 Trivy Container & Filesystem Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner in repo mode
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          ignore-unfixed: true
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'

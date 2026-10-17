@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: encoding-service
+  namespace: ott-platform
+  labels:
+    app: encoding-service
+    tier: worker
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: encoding-service
+  template:
+    metadata:
+      labels:
+        app: encoding-service
+        tier: worker
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3008"
+        prometheus.io/path: "/metrics"
+    spec:
+      initContainers:
+        - name: init-video-directories
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - "mkdir -p /videos/raw /videos/encoded /videos/uploads /videos/live && chmod -R 777 /videos"
+          volumeMounts:
+            - name: video-storage
+              mountPath: /videos
+      containers:
+        - name: encoding-service
+          image: ott-encoding-service:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: ott-config
+            - secretRef:
+                name: ott-secrets
+          env:
+            - name: PORT
+              value: "3008"
+            - name: NODE_OPTIONS
+              value: "--max-old-space-size=1024"
+            - name: FFMPEG_PRESET
+              value: "superfast"
+            - name: FFMPEG_THREADS_PER_PROFILE
+              value: "2"
+          ports:
+            - containerPort: 3008
+              name: http
+          volumeMounts:
+            - name: video-storage
+              mountPath: /videos
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3008
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3008
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 2048Mi
+      volumes:
+        - name: video-storage
+          persistentVolumeClaim:
+            claimName: videos-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: encoding-service
+  namespace: ott-platform
+  labels:
+    app: encoding-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3008
+      targetPort: 3008
+      name: http
+  selector:
+    app: encoding-service

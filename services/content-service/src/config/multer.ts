@@ -12,7 +12,7 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Configure storage
+// Configure storage for standard legacy uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadDir);
@@ -25,11 +25,10 @@ const storage = multer.diskStorage({
 
 // File filter - only accept video files (or any file for now)
 const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-  // Accept any file for now - we can validate later
   cb(null, true);
 };
 
-// Configure multer
+// Configure standard monolithic upload
 const upload = multer({
   storage,
   fileFilter,
@@ -38,5 +37,26 @@ const upload = multer({
   }
 });
 
-export default upload;
+// Configure chunk storage for resumable multipart uploads
+export const chunkUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const uploadId = (req.query.uploadId as string) || (req.headers['x-upload-id'] as string) || req.body?.uploadId || 'default';
+      const chunksDir = path.join(uploadDir, uploadId, 'chunks');
+      if (!fs.existsSync(chunksDir)) {
+        fs.mkdirSync(chunksDir, { recursive: true });
+      }
+      cb(null, chunksDir);
+    },
+    filename: (req, file, cb) => {
+      const chunkIndexRaw = req.query.chunkIndex !== undefined ? req.query.chunkIndex : (req.headers['x-chunk-index'] !== undefined ? req.headers['x-chunk-index'] : req.body?.chunkIndex);
+      const chunkIndex = Number(chunkIndexRaw !== undefined ? chunkIndexRaw : 0);
+      cb(null, `chunk_${String(chunkIndex).padStart(5, '0')}.part`);
+    }
+  }),
+  limits: {
+    fileSize: 100 * 1024 * 1024 // 100MB max per chunk
+  }
+});
 
+export default upload;

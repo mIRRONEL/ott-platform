@@ -1,0 +1,74 @@
+# ==============================================================================
+# OTT Platform - Deep Debugging & Troubleshooting Overlay
+# ==============================================================================
+# Direct Port Access & Verbose Logging for Local Inspection
+# Apply via: ./scripts/set-mode.sh debug
+# Or: docker compose -f docker-compose.yml -f docker-compose.debug.yml up -d
+# ==============================================================================
+
+services:
+  # Expose Microservices directly to host localhost for curl / Postman
+  auth-service:
+    ports:
+      - "127.0.0.1:3001:3001"
+    environment:
+      LOG_LEVEL: debug
+
+  user-service:
+    ports:
+      - "127.0.0.1:3002:3002"
+    environment:
+      LOG_LEVEL: debug
+
+  content-service:
+    ports:
+      - "127.0.0.1:3003:3003"
+    environment:
+      LOG_LEVEL: debug
+
+  streaming-service:
+    ports:
+      - "127.0.0.1:3004:3004"
+    environment:
+      LOG_LEVEL: debug
+
+  payment-service:
+    ports:
+      - "127.0.0.1:3005:3005"
+    environment:
+      LOG_LEVEL: debug
+
+  notification-service:
+    ports:
+      - "127.0.0.1:3006:3006"
+    environment:
+      LOG_LEVEL: debug
+
+  analytics-service:
+    ports:
+      - "127.0.0.1:3007:3007"
+    environment:
+      LOG_LEVEL: debug
+
+  encoding-service:
+    ports:
+      - "127.0.0.1:3008:3008"
+    environment:
+      LOG_LEVEL: debug
+
+  # Expose Databases for DBeaver, Compass, Redis-CLI, Postman
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  mongodb:
+    ports:
+      - "127.0.0.1:27017:27017"
+
+  redis:
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  elasticsearch:
+    ports:
+      - "127.0.0.1:9200:9200"

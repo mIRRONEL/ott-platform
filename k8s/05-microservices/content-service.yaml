@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: content-service
+  namespace: ott-platform
+  labels:
+    app: content-service
+    tier: backend
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: content-service
+  template:
+    metadata:
+      labels:
+        app: content-service
+        tier: backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3003"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: content-service
+          image: ott-content-service:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: ott-config
+            - secretRef:
+                name: ott-secrets
+          env:
+            - name: PORT
+              value: "3003"
+            - name: NODE_OPTIONS
+              value: "--max-old-space-size=1024"
+            - name: REQUEST_TIMEOUT
+              value: "3600000"
+            - name: FFMPEG_TIMEOUT
+              value: "3600000"
+            - name: MONGO_POOL_SIZE
+              value: "100"
+          ports:
+            - containerPort: 3003
+              name: http
+          volumeMounts:
+            - name: video-storage
+              mountPath: /videos
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3003
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3003
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1024Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1001
+      volumes:
+        - name: video-storage
+          persistentVolumeClaim:
+            claimName: videos-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: content-service
+  namespace: ott-platform
+  labels:
+    app: content-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3003
+      targetPort: 3003
+      name: http
+  selector:
+    app: content-service

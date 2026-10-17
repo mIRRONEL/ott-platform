@@ -1,0 +1,518 @@
+# ==============================================================================
+# OTT Platform - Application Microservices Tier
+# ==============================================================================
+# Services: Auth, User, Encoding, Content, Streaming, Live, Payment, Notification,
+#           Analytics, API Gateway
+# ==============================================================================
+
+services:
+  # Auth Service
+  auth-service:
+    build:
+      context: ../services/auth-service
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_started
+      mongodb:
+        condition: service_started
+      redis:
+        condition: service_started
+      kafka-1:
+        condition: service_started
+      kafka-2:
+        condition: service_started
+      kafka-3:
+        condition: service_started
+    secrets:
+      - postgres_password
+      - mongo_app_password
+      - redis_password
+      - jwt_secret
+      - jwt_refresh_secret
+      - internal_service_secret
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      PGAPPNAME: auth-service
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_NAME: ott_platform
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BROKERS: kafka-1:9092,kafka-2:9092,kafka-3:9092
+      KAFKA_RETRY_INITIAL_RETRY_TIME: 100
+      KAFKA_CONNECT_TIMEOUT: 15000
+      KAFKA_REQUEST_TIMEOUT: 30000
+      KAFKA_COMPRESSION_TYPE: snappy
+      NODE_OPTIONS: --max-old-space-size=512
+      DB_POOL_MIN: 5
+      DB_POOL_MAX: 20
+    expose:
+      - "3001"
+    networks:
+      - ott-app-net
+      - ott-data-net
+      - ott-network
+    command: node dist/index.js
+    restart: unless-stopped
+
+  # User Service
+  user-service:
+    build:
+      context: ../services/user-service
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_started
+      mongodb:
+        condition: service_started
+      redis:
+        condition: service_started
+      kafka-1:
+        condition: service_started
+      kafka-2:
+        condition: service_started
+      kafka-3:
+        condition: service_started
+    secrets:
+      - postgres_password
+      - mongo_app_password
+      - redis_password
+      - jwt_secret
+      - internal_service_secret
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      PGAPPNAME: user-service
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_NAME: ott_platform
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BROKERS: kafka-1:9092,kafka-2:9092,kafka-3:9092
+      KAFKA_RETRY_MAX_RETRIES: 15
+      KAFKA_RETRY_INITIAL_RETRY_TIME: 100
+      KAFKA_CONNECT_TIMEOUT: 15000
+      KAFKA_REQUEST_TIMEOUT: 30000
+      KAFKA_COMPRESSION_TYPE: snappy
+      NODE_OPTIONS: --max-old-space-size=512
+      DB_POOL_MIN: 5
+      DB_POOL_MAX: 20
+    expose:
+      - "3002"
+    networks:
+      - ott-app-net
+      - ott-data-net
+      - ott-network
+    command: node dist/index.js
+    restart: unless-stopped
+
+  # Encoding Shared Volume Initializer
+  encoding-volume-init:
+    image: alpine:3.20
+    volumes:
+      - videos_data:/videos
+      - ott_uploads:/tmp/ott-uploads
+    user: "0:0"
+    command: ["sh", "-c", "mkdir -p /videos/raw /videos/encoded /videos/live /tmp/ott-uploads && chown -R 1001:1001 /videos /tmp/ott-uploads && chmod 750 /videos /videos/raw /videos/encoded /videos/live /tmp/ott-uploads"]
+    networks:
+      - ott-app-net
+      - ott-data-net
+      - ott-network
+    restart: "no"
+
+  # Encoding Service (FFmpeg Multi-Bitrate HLS Transcoder)
+  encoding-service:
+    build:
+      context: ../services/encoding-service
+      dockerfile: Dockerfile
+    depends_on:
+      encoding-volume-init:
+        condition: service_completed_successfully
+      kafka-1:
+        condition: service_started
+      kafka-2:
+        condition: service_started
+      kafka-3:
+        condition: service_started
+    secrets:
+      - internal_service_secret
+    environment:
+      NODE_ENV: production
+      PORT: 3008
+      LOG_LEVEL: info
+      KAFKA_BROKERS: kafka-1:9092,kafka-2:9092,kafka-3:9092
+      KAFKA_RETRY_INITIAL_RETRY_TIME: 100
+      KAFKA_CONNECT_TIMEOUT: 15000
+      KAFKA_REQUEST_TIMEOUT: 30000
+      VIDEOS_DIR: /videos
+      ENCODED_VIDEOS_DIR: /videos/encoded
+      RAW_VIDEOS_DIR: /videos/raw
+      AUTO_DELETE_RAW_AFTER_ENCODE: ${AUTO_DELETE_RAW_AFTER_ENCODE:-true}
+      FFMPEG_PRESET: medium
+      NODE_OPTIONS: --max-old-space-size=1024
+      UPLOAD_DIR: /tmp/ott-uploads
+    volumes:
+      - videos_data:/videos
+      - ott_uploads:/tmp/ott-uploads
+    expose:
+      - "3008"
+    networks:
+      - ott-app-net
+      - ott-data-net
+      - ott-network
+    command: node dist/index.js
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:3008/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # Content Service
+  content-service:
+    build:
+      context: ../services/content-service
+      dockerfile: Dockerfile
+    depends_on:
+      mongodb:
+        condition: service_started
+      elasticsearch:
+        condition: service_started
+      redis:
+        condition: service_started
+    secrets:
+      - mongo_app_password
+      - redis_password
+      - jwt_secret
+      - internal_service_secret
+    environment:
+      NODE_ENV: production
+      PORT: 3003
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      UPLOAD_DIR: /tmp/ott-uploads
+      HLS_OUTPUT_DIR: /tmp/ott-hls
+      RAW_VIDEOS_DIR: /videos/raw
+      AUTO_DELETE_RAW_AFTER_ENCODE: ${AUTO_DELETE_RAW_AFTER_ENCODE:-true}
+      KAFKA_BROKERS: kafka-1:9092,kafka-2:9092,kafka-3:9092
+      KAFKA_COMPRESSION_TYPE: snappy
+      NODE_OPTIONS: --max-old-space-size=1024
+      REQUEST_TIMEOUT: 3600000
+      FFMPEG_TIMEOUT: 3600000
+      MONGO_POOL_SIZE: 100
+    expose:
+      - "3003"
+    volumes:
+      - ott_uploads:/tmp/ott-uploads
+      - ott_hls:/tmp/ott-hls
+      - videos_data:/videos
+    networks:
+      - ott-edge-net
+      - ott-app-net
+      - ott-data-net
+      - ott-network
+    command: node dist/index.js
+    restart: unless-stopped
+
+  # Streaming Service
+  streaming-service:
+    build:
+      context: ../services/streaming-service
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_started
+      mongodb:
+        condition: service_started
+      redis:
+        condition: service_started
+      kafka-1:
+        condition: service_started
+      kafka-2:
+        condition: service_started
+      kafka-3:
+        condition: service_started
+    secrets:
+      - postgres_password
+      - mongo_app_password
+      - redis_password
+      - jwt_secret
+      - internal_service_secret
+    environment:
+      NODE_ENV: production
+      PORT: 3004
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_NAME: ott_platform
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BROKERS: kafka-1:9092,kafka-2:9092,kafka-3:9092
+      KAFKA_RETRY_MAX_RETRIES: 15
+      KAFKA_RETRY_INITIAL_RETRY_TIME: 100
+      KAFKA_RETRY_RETRIES: 20
+      KAFKA_CONNECT_TIMEOUT: 15000
+      KAFKA_REQUEST_TIMEOUT: 30000
+      KAFKA_COMPRESSION_TYPE: snappy
+      API_URL: http://localhost:3000
+      VIDEOS_DIR: /videos
+      REQUEST_TIMEOUT: 300000
+      NODE_OPTIONS: --max-old-space-size=512
+      DB_POOL_MIN: 5
+      DB_POOL_MAX: 20
+    expose:
+      - "3004"
+    volumes:
+      - videos_data:/videos
+    networks:
+      - ott-app-net
+      - ott-data-net
+      - ott-network
+    command: node dist/index.js
+    restart: unless-stopped
+
+  # Live Streaming & RTMP Creator Ingest Service
+  live-service:
+    build:
+      context: ../services/live-service
+      dockerfile: Dockerfile
+    depends_on:
+      mongodb:
+        condition: service_started
+      redis:
+        condition: service_started
+      kafka-1:
+        condition: service_started
+    secrets:
+      - mongo_app_password
+      - redis_password
+      - jwt_secret
+      - internal_service_secret
+    environment:
+      NODE_ENV: production
+      PORT: 3009
+      RTMP_PORT: 1935
+      DB_NAME: ott_platform
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BROKERS: kafka-1:9092,kafka-2:9092,kafka-3:9092
+      VIDEOS_DIR: /videos
+      NODE_OPTIONS: --max-old-space-size=512
+    ports:
+      - "1935:1935"
+    expose:
+      - "3009"
+      - "8000"
+    volumes:
+      - videos_data:/videos
+    networks:
+      - ott-edge-net
+      - ott-app-net
+      - ott-data-net
+      - ott-network
+    command: node dist/index.js
+    restart: unless-stopped
+
+  # Payment Service
+  payment-service:
+    build:
+      context: ../services/payment-service
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_started
+      redis:
+        condition: service_started
+      kafka-1:
+        condition: service_started
+      kafka-2:
+        condition: service_started
+      kafka-3:
+        condition: service_started
+    secrets:
+      - postgres_password
+      - redis_password
+      - jwt_secret
+      - stripe_api_key
+      - internal_service_secret
+    environment:
+      NODE_ENV: production
+      PORT: 3005
+      PGAPPNAME: payment-service
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_NAME: ott_platform
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BROKERS: kafka-1:9092,kafka-2:9092,kafka-3:9092
+      KAFKA_RETRY_MAX_RETRIES: 15
+      KAFKA_RETRY_INITIAL_RETRY_TIME: 100
+      KAFKA_CONNECT_TIMEOUT: 15000
+      KAFKA_REQUEST_TIMEOUT: 30000
+      KAFKA_COMPRESSION_TYPE: snappy
+      NODE_OPTIONS: --max-old-space-size=512
+      DB_POOL_MIN: 5
+      DB_POOL_MAX: 20
+    expose:
+      - "3005"
+    networks:
+      - ott-app-net
+      - ott-data-net
+      - ott-network
+    command: node dist/index.js
+    restart: unless-stopped
+
+  # Notification Service
+  notification-service:
+    build:
+      context: ../services/notification-service
+      dockerfile: Dockerfile
+    depends_on:
+      mongodb:
+        condition: service_started
+      kafka-1:
+        condition: service_started
+      kafka-2:
+        condition: service_started
+      kafka-3:
+        condition: service_started
+      redis:
+        condition: service_started
+    secrets:
+      - mongo_app_password
+      - redis_password
+      - jwt_secret
+      - internal_service_secret
+    environment:
+      NODE_ENV: production
+      PORT: 3006
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BROKERS: kafka-1:9092,kafka-2:9092,kafka-3:9092
+      KAFKA_CONSUMER_GROUP: notification-service
+      KAFKA_RETRY_MAX_RETRIES: 15
+      KAFKA_RETRY_INITIAL_RETRY_TIME: 100
+      KAFKA_RETRY_RETRIES: 20
+      KAFKA_CONNECT_TIMEOUT: 15000
+      KAFKA_REQUEST_TIMEOUT: 30000
+      KAFKA_COMPRESSION_TYPE: snappy
+      NODE_OPTIONS: --max-old-space-size=512
+    expose:
+      - "3006"
+    networks:
+      - ott-app-net
+      - ott-data-net
+      - ott-network
+    command: node dist/index.js
+    restart: unless-stopped
+
+  # Analytics Service
+  analytics-service:
+    build:
+      context: ../services/analytics-service
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_started
+      mongodb:
+        condition: service_started
+      redis:
+        condition: service_started
+      kafka-1:
+        condition: service_started
+      kafka-2:
+        condition: service_started
+      kafka-3:
+        condition: service_started
+    secrets:
+      - postgres_password
+      - mongo_app_password
+      - redis_password
+      - jwt_secret
+      - internal_service_secret
+    environment:
+      NODE_ENV: production
+      PORT: 3007
+      PGAPPNAME: analytics-service
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_NAME: ott_platform
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BROKERS: kafka-1:9092,kafka-2:9092,kafka-3:9092
+      KAFKA_CONSUMER_GROUP: analytics-service
+      KAFKA_RETRY_INITIAL_RETRY_TIME: 100
+      KAFKA_CONNECT_TIMEOUT: 15000
+      KAFKA_REQUEST_TIMEOUT: 30000
+      KAFKA_PRODUCER_RETRIES: 2147483647 
+      KAFKA_COMPRESSION_TYPE: snappy
+      NODE_OPTIONS: --max-old-space-size=512
+      DB_POOL_MIN: 5
+      DB_POOL_MAX: 20
+    expose:
+      - "3007"
+    networks:
+      - ott-app-net
+      - ott-data-net
+      - ott-network
+    command: node dist/index.js
+    restart: unless-stopped
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ../services/api-gateway
+      dockerfile: Dockerfile
+    depends_on:
+      auth-service:
+        condition: service_started
+      user-service:
+        condition: service_started
+      content-service:
+        condition: service_started
+      streaming-service:
+        condition: service_started
+      payment-service:
+        condition: service_started
+      notification-service:
+        condition: service_started
+      analytics-service:
+        condition: service_started
+      redis:
+        condition: service_started
+    secrets:
+      - redis_password
+      - jwt_secret
+      - internal_service_secret
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      AUTH_SERVICE_URL: http://auth-service:3001
+      USER_SERVICE_URL: http://user-service:3002
+      CONTENT_SERVICE_URL: http://content-service:3003
+      STREAMING_SERVICE_URL: http://streaming-service:3004
+      PAYMENT_SERVICE_URL: http://payment-service:3005
+      NOTIFICATION_SERVICE_URL: http://notification-service:3006
+      ANALYTICS_SERVICE_URL: http://analytics-service:3007
+      REQUEST_TIMEOUT: 3600000
+      PROXY_TIMEOUT: 3600000
+      NODE_OPTIONS: --max-old-space-size=512
+    ports:
+      - "3000:3000"
+    networks:
+      - ott-edge-net
+      - ott-app-net
+      - ott-data-net
+      - ott-network
+    command: node dist/index.js
+    restart: unless-stopped

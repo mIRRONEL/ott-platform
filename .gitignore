@@ -13,9 +13,16 @@ pnpm-debug.log*
 dist/
 build/
 
-# Env files
+# Env & Secret files
 .env
 .env.*
+!.env.example
+secrets/
+env/
+*.key
+
+# Backups & Dumps
+backups/
 
 # OS
 .DS_Store
@@ -31,3 +38,11 @@ Thumbs.db
 # HLS/Uploads
 /tmp/
 ott_uploads/
+
+API-AUDIT.md
+CODE_REVIEW.md
+COMPOSE_COMPARISON.md
+LOAD-TEST-RESULTS.md
+load-test-results.txt
+load-test.sh
+PROJECT_DETAILS.md
